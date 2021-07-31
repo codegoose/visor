@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Default",
+            "cppStandard": "c++17",
+            "includePath": [
+
+            ],
+            "defines": [
+
+            ]
+        }
+    ],
+    "version": 4
+}

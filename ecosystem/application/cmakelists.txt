@@ -1,0 +1,8 @@
+add_executable(visor
+    "main.cxx"
+)
+
+target_link_libraries(visor
+    CONAN_PKG::spdlog
+    CONAN_PKG::fmt
+)
