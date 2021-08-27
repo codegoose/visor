@@ -191,9 +191,9 @@ void emit_axis_profile_slice(std::string_view name) {
     ImGui::EndChild();
 }
 
-void Application::emitUserInterface(const int &cfbw, const int &cfbh) {
+void sc::visor::emit_ui(const glm::ivec2 &framebuffer_size) {
     ImGui::SetNextWindowPos({ 0, 0 }, ImGuiCond_Always);
-    ImGui::SetNextWindowSize({ static_cast<float>(cfbw), static_cast<float>(cfbh) }, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({ static_cast<float>(framebuffer_size.x), static_cast<float>(framebuffer_size.y) }, ImGuiCond_Always);
     if (ImGui::Begin("##PrimaryWindow", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu(fmt::format("{} File", ICON_FA_FILE_CODE).data())) {

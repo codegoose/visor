@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Application {
+namespace sc::visor {
 
-    void emitUserInterface(const int &cfbw, const int &cfbh);
+    void emit_ui(const glm::ivec2 &framebuffer_size);
 }

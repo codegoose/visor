@@ -1,9 +1,10 @@
 add_executable(visor
+    "visor.rc"
     "main.cxx"
     "ui.cxx"
     "../common/imgui_freetype.cpp"
-    "../common/imgui_impl_glfw.cpp"
     "../common/imgui_impl_opengl3.cpp"
+    "../common/imgui_impl_sdl.cpp"
     "../common/hid.cxx"
 )
 
@@ -11,8 +12,10 @@ target_link_libraries(visor
     CONAN_PKG::glm
     CONAN_PKG::spdlog
     CONAN_PKG::fmt
-    CONAN_PKG::glfw
+    CONAN_PKG::sdl
     CONAN_PKG::glbinding
+    CONAN_PKG::imgui
+    CONAN_PKG::freetype
 
     # HID stuff
 

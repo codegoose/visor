@@ -1,18 +1,27 @@
+#include "vjoy-pub-2-1-9-1.h"
+
+#define	VJOY_HWID_TMPLT TEXT("root\\VID_%04X&PID_%04X&REV_%04X")
+
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 
 #include <spdlog/spdlog.h>
 
 #define DIRECTINPUT_VERSION 0x0800
 
+#include <tchar.h>
 #include <dinput.h>
+#include <newdev.h>
 
 #include "hid.h"
+
+#include <stdio.h>
 
 #include <array>
 #include <memory>
 #include <set>
 #include <map>
 #include <codecvt>
+#include <filesystem>
 
 #include <windows.h>
 #include <hidsdi.h>
@@ -21,6 +30,10 @@
 #include <setupapi.h>
 #include <initguid.h>
 #include <devpkey.h>
+
+#ifndef DIDFT_OPTIONAL
+#define DIDFT_OPTIONAL 0x80000000
+#endif
 
 typedef std::unique_ptr<std::remove_pointer<HANDLE>::type, decltype(&::CloseHandle)> ptr_closehandle;
 typedef std::unique_ptr<std::remove_pointer<HANDLE>::type, decltype(&::FindVolumeClose)> ptr_findvolumeclose;
@@ -34,6 +47,11 @@ constexpr auto IoControlSetBlacklist { CTL_CODE(IoControlDeviceType, 2051, METHO
 constexpr auto IoControlSetWhitelist { CTL_CODE(IoControlDeviceType, 2049, METHOD_BUFFERED, FILE_READ_DATA) };
 constexpr auto IoControlGetActive { CTL_CODE(IoControlDeviceType, 2052, METHOD_BUFFERED, FILE_READ_DATA) };
 constexpr auto IoControlSetActive { CTL_CODE(IoControlDeviceType, 2053, METHOD_BUFFERED, FILE_READ_DATA) };
+
+typedef BOOL (WINAPI *UpdateDriverForPlugAndPlayDevicesProto)(_In_opt_ HWND hwndParent, __in LPCTSTR HardwareId, __in LPCTSTR FullInfPath, __in DWORD InstallFlags, __out_opt PBOOL bRebootRequired);
+
+#undef min
+#undef max
 
 static auto logger() {
     return spdlog::default_logger();
@@ -208,6 +226,149 @@ namespace sc::hid {
 
     static std::map<std::pair<std::string, std::string>, std::string> vid_pid_product_map;
 
+    static bool di8_supports_xinput(const GUID* guid) {
+        UINT i, count = 0;
+        bool result = false;
+        if (GetRawInputDeviceList(NULL, &count, sizeof(RAWINPUTDEVICELIST)) != 0) return false;
+        std::vector<RAWINPUTDEVICELIST> ridls(count);
+        if (GetRawInputDeviceList(ridls.data(), &count, sizeof(RAWINPUTDEVICELIST)) == (UINT) -1) return false;
+        ridls.resize(count);
+        for (i = 0;  i < count;  i++) {
+            RID_DEVICE_INFO rdi;
+            char name[256];
+            UINT size;
+            if (ridls[i].dwType != RIM_TYPEHID) continue;
+            ZeroMemory(&rdi, sizeof(rdi));
+            rdi.cbSize = sizeof(rdi);
+            size = sizeof(rdi);
+            if ((INT) GetRawInputDeviceInfoA(ridls[i].hDevice, RIDI_DEVICEINFO, &rdi, &size) == -1) continue;
+            if (MAKELONG(rdi.hid.dwVendorId, rdi.hid.dwProductId) != (LONG) guid->Data1) continue;
+            memset(name, 0, sizeof(name));
+            size = sizeof(name);
+            if ((INT) GetRawInputDeviceInfoA(ridls[i].hDevice, RIDI_DEVICENAME, name, &size) == -1) break;
+            name[sizeof(name) - 1] = '\0';
+            if (strstr(name, "IG_")) {
+                result = true;
+                break;
+            }
+        }
+        return result;
+    }
+
+    static IDirectInput8 *direct_input_8_context = nullptr;
+
+    static DIOBJECTDATAFORMAT direct_input_8_object_data_formats[] = {
+        { &GUID_XAxis, DIJOFS_X, DIDFT_AXIS | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, DIDOI_ASPECTPOSITION },
+        { &GUID_YAxis, DIJOFS_Y, DIDFT_AXIS | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, DIDOI_ASPECTPOSITION },
+        { &GUID_ZAxis, DIJOFS_Z, DIDFT_AXIS | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, DIDOI_ASPECTPOSITION },
+        { &GUID_RxAxis, DIJOFS_RX, DIDFT_AXIS | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, DIDOI_ASPECTPOSITION },
+        { &GUID_RyAxis, DIJOFS_RY, DIDFT_AXIS | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, DIDOI_ASPECTPOSITION },
+        { &GUID_RzAxis, DIJOFS_RZ, DIDFT_AXIS | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, DIDOI_ASPECTPOSITION },
+        { &GUID_Slider, DIJOFS_SLIDER(0), DIDFT_AXIS | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, DIDOI_ASPECTPOSITION },
+        { &GUID_Slider, DIJOFS_SLIDER(1), DIDFT_AXIS | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, DIDOI_ASPECTPOSITION },
+        { &GUID_POV, DIJOFS_POV(0), DIDFT_POV| DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { &GUID_POV, DIJOFS_POV(1), DIDFT_POV| DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { &GUID_POV, DIJOFS_POV(2), DIDFT_POV| DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { &GUID_POV, DIJOFS_POV(3), DIDFT_POV| DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(0), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(1), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(2), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(3), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(4), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(5), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(6), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(7), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(8), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(9), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(10), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(11), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(12), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(13), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(14), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(15), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(16), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(17), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(18), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(19), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(20), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(21), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(22), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(23), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(24), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(25), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(26), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(27), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(28), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(29), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(30), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+        { NULL, DIJOFS_BUTTON(31), DIDFT_BUTTON | DIDFT_OPTIONAL | DIDFT_ANYINSTANCE, 0 },
+    };
+
+    static const DIDATAFORMAT direct_input_8_data_format = {
+        sizeof(DIDATAFORMAT),
+        sizeof(DIOBJECTDATAFORMAT),
+        DIDFT_ABSAXIS,
+        sizeof(DIJOYSTATE),
+        sizeof(direct_input_8_object_data_formats) / sizeof(DIOBJECTDATAFORMAT),
+        direct_input_8_object_data_formats
+    };
+
+    enum class di8_object_type {
+        SLIDER,
+        AXIS,
+        BUTTON,
+        POV
+    };
+
+    struct di8_object {
+        IDirectInputDevice8 *device = nullptr;
+        int num_sliders = 0, num_buttons = 0, num_povs = 0, num_axes = 0;
+    };
+
+    static BOOL CALLBACK di8_enum_device_objects(const DIDEVICEOBJECTINSTANCE *doi, void *user) {
+        auto object = reinterpret_cast<di8_object *>(user);
+        std::optional<di8_object_type> obj_type;
+        std::optional<int> obj_offset;
+        if (DIDFT_GETTYPE(doi->dwType) & DIDFT_AXIS) {
+            DIPROPRANGE dipr;
+            if (memcmp(&doi->guidType, &GUID_Slider, sizeof(GUID)) == 0) obj_offset = DIJOFS_SLIDER(object->num_sliders);
+            else if (memcmp(&doi->guidType, &GUID_XAxis, sizeof(GUID)) == 0) obj_offset = DIJOFS_X;
+            else if (memcmp(&doi->guidType, &GUID_YAxis, sizeof(GUID)) == 0) obj_offset = DIJOFS_Y;
+            else if (memcmp(&doi->guidType, &GUID_ZAxis, sizeof(GUID)) == 0) obj_offset = DIJOFS_Z;
+            else if (memcmp(&doi->guidType, &GUID_RxAxis, sizeof(GUID)) == 0) obj_offset = DIJOFS_RX;
+            else if (memcmp(&doi->guidType, &GUID_RyAxis, sizeof(GUID)) == 0) obj_offset = DIJOFS_RY;
+            else if (memcmp(&doi->guidType, &GUID_RzAxis, sizeof(GUID)) == 0) obj_offset = DIJOFS_RZ;
+            else return DIENUM_CONTINUE;
+            ZeroMemory(&dipr, sizeof(dipr));
+            dipr.diph.dwSize = sizeof(dipr);
+            dipr.diph.dwHeaderSize = sizeof(dipr.diph);
+            dipr.diph.dwObj = doi->dwType;
+            dipr.diph.dwHow = DIPH_BYID;
+            dipr.lMin = std::numeric_limits<short>::min();
+            dipr.lMax =  std::numeric_limits<short>::max();
+            if (FAILED(IDirectInputDevice8_SetProperty(object->device, DIPROP_RANGE, &dipr.diph))) return DIENUM_CONTINUE;
+            if (memcmp(&doi->guidType, &GUID_Slider, sizeof(GUID)) == 0) {
+                obj_type = di8_object_type::SLIDER;
+                object->num_sliders++;
+            } else {
+                obj_type = di8_object_type::AXIS;
+                object->num_axes++;
+            }
+        } else if (DIDFT_GETTYPE(doi->dwType) & DIDFT_BUTTON) {
+            obj_offset = DIJOFS_BUTTON(object->num_buttons);
+            obj_type = di8_object_type::BUTTON;
+            object->num_buttons++;
+        } else if (DIDFT_GETTYPE(doi->dwType) & DIDFT_POV) {
+            obj_offset = DIJOFS_POV(object->num_povs);
+            obj_type = di8_object_type::POV;
+            object->num_povs++;
+        }
+        if (obj_type && obj_offset && *obj_type != di8_object_type::BUTTON) {
+            logger()->critical(">> offset: {}, type: {}", *obj_offset, static_cast<int>(*obj_type));
+        }
+        return DIENUM_CONTINUE;
+    }
+
     static BOOL CALLBACK di8_enum_device_callback(const DIDEVICEINSTANCE *di, void *user) {
         if (auto product_guid = sc::hid::convert_guid_to_string(di->guidProduct); product_guid.has_value() && product_guid->size() == 38) {
             auto guid_str = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(product_guid->data());
@@ -216,19 +377,60 @@ namespace sc::hid {
             if (vid_pid_product_map.find({ vid, pid }) == vid_pid_product_map.end()) {
                 logger()->debug("New product mapping: VID [{}], PID [{}] -> NAME [{}] (GUID [{}])", vid, pid, di->tszProductName, guid_str);
                 vid_pid_product_map[{ vid, pid }] = di->tszProductName;
+                /*
+                logger()->critical("---");
+                if (DIDFT_GETTYPE(di->dwDevType) & DIDFT_AXIS) {
+                    logger()->critical("Device is axis: {}", di->tszProductName);
+                }
+                if (DIDFT_GETTYPE(di->dwDevType) & DIDFT_BUTTON) {
+                    logger()->critical("Device is button: {}", di->tszProductName);
+                }
+                if (DIDFT_GETTYPE(di->dwDevType) & DIDFT_POV) {
+                    logger()->critical("Device is hat: {}", di->tszProductName);
+                }
+                const bool supports_xinput = di8_supports_xinput(&di->guidProduct);
+                if (!supports_xinput) {
+                    logger()->info("Xinput: {}", supports_xinput);
+                    if (IDirectInputDevice8 *device = nullptr; SUCCEEDED(IDirectInput8_CreateDevice(direct_input_8_context, di->guidInstance, &device, nullptr))) {
+                        if (SUCCEEDED(IDirectInputDevice8_SetDataFormat(device, &direct_input_8_data_format))) {
+                            DIDEVCAPS capabilities;
+                            memset(&capabilities, 0, sizeof(DIDEVCAPS));
+                            capabilities.dwSize = sizeof(DIDEVCAPS);
+                            if (SUCCEEDED(IDirectInputDevice8_GetCapabilities(device, &capabilities))) {
+                                DIPROPDWORD dipd;
+                                memset(&dipd, 0, sizeof(DIPROPDWORD));
+                                dipd.diph.dwSize = sizeof(dipd);
+                                dipd.diph.dwHeaderSize = sizeof(dipd.diph);
+                                dipd.diph.dwHow = DIPH_DEVICE;
+                                dipd.dwData = DIPROPAXISMODE_ABS;
+                                if (SUCCEEDED(IDirectInputDevice8_SetProperty(device, DIPROP_AXISMODE, &dipd.diph))) {
+                                    logger()->critical("{} axes, {} buttons, {} hats", capabilities.dwAxes, capabilities.dwButtons, capabilities.dwPOVs);
+                                    di8_object obj;
+                                    obj.device = device;
+                                    if (SUCCEEDED(IDirectInputDevice8_EnumObjects(device, di8_enum_device_objects, &obj, DIDFT_AXIS | DIDFT_BUTTON | DIDFT_POV))) {
+                                        logger()->critical("Got device.");
+                                    }
+                                }
+                            }
+                        }
+                        device->Release();
+                    } else logger()->critical("Failed to create device.");
+                } else logger()->critical("Xinput: {}", supports_xinput);
+                logger()->critical("--- eod");
+                */
             }
         } else logger()->warn("Failed to resolve VID/PID of device: {}", di->tszProductName);
         return DIENUM_CONTINUE;
     }
 
     bool populate_vid_pid_to_product_name_map() {
-        IDirectInput8 *direct_input_8_context;
         if (SUCCEEDED(DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&direct_input_8_context, NULL))) {
             if (SUCCEEDED(IDirectInput8_EnumDevices(direct_input_8_context, DI8DEVCLASS_ALL, di8_enum_device_callback, NULL, DIEDFL_ALLDEVICES))) {
                 logger()->debug("Enumerated DirectInput8 devices.");
                 return true;
             } else logger()->warn("Failed to enumerate DirectInput8 devices.");
             direct_input_8_context->Release();
+            direct_input_8_context = nullptr;
         } else logger()->warn("Failed to establish DirectInput8 context.");
         return false;
     }
@@ -284,6 +486,158 @@ bool sc::hid::set_whitelist(const std::vector<std::filesystem::path> &new_list) 
     return true;
 }
 
+LPTSTR * GetMultiSzIndexArray(__in __drv_aliasesMem LPTSTR MultiSz) {
+    LPTSTR scan;
+    LPTSTR * array;
+    int elements;
+
+    for(scan = MultiSz, elements = 0; scan[0] ;elements++) {
+        scan += lstrlen(scan)+1;
+    }
+    array = new LPTSTR[elements+2];
+    if(!array) {
+        return NULL;
+    }
+    array[0] = MultiSz;
+    array++;
+    if(elements) {
+        for(scan = MultiSz, elements = 0; scan[0]; elements++) {
+            array[elements] = scan;
+            scan += lstrlen(scan)+1;
+        }
+    }
+    array[elements] = NULL;
+    return array;
+}
+
+LPTSTR * GetDevMultiSz(__in HDEVINFO Devs, __in PSP_DEVINFO_DATA DevInfo, __in DWORD Prop) {
+    LPTSTR buffer = NULL;
+    DWORD reqSize = 16000;
+    DWORD dataType;
+    LPTSTR * array;
+    DWORD szChars;
+	BOOL bRes;
+
+
+	// Getting the size of required buffer
+#if 0
+	bRegProp = SetupDiGetDeviceRegistryProperty(Devs, DevInfo, Prop, NULL, NULL, 0, &reqSize);
+	DWORD err = GetLastError();
+	if (err != ERROR_INSUFFICIENT_BUFFER)
+		return NULL;
+
+#endif // 0
+
+
+	// Allocate buffer according to required size
+    buffer = new TCHAR[(reqSize /sizeof(TCHAR))+2];
+    if(!buffer)
+		return NULL;
+
+	// Get the string into the buffer 
+	bRes = SetupDiGetDeviceRegistryProperty(Devs, DevInfo, Prop, &dataType, (LPBYTE)buffer, reqSize, &reqSize);
+	if (!bRes || ((dataType != REG_SZ) && (dataType != REG_MULTI_SZ)))
+		return NULL;
+
+	szChars = reqSize / sizeof(TCHAR);
+	buffer[szChars] = TEXT('\0');
+	buffer[szChars + 1] = TEXT('\0');
+	array = GetMultiSzIndexArray(buffer);
+    if(array)
+        return array;
+
+    if(buffer) {
+        delete [] buffer;
+    }
+    return NULL;
+}
+
+void DelMultiSz(__in_opt __drv_freesMem(object) PZPWSTR Array) {
+        if(Array) {
+        Array--;
+        if(Array[0]) {
+            delete [] Array[0];
+        }
+        delete [] Array;
+    }
+}
+
+static std::optional<bool> is_vjoy_installed() {
+    TCHAR vjoy_instance_id[MAX_DEVICE_ID_LEN];
+    TCHAR device_hwid[MAX_PATH];
+    _stprintf_s(device_hwid, MAX_PATH, VJOY_HWID_TMPLT,VENDOR_N_ID, PRODUCT_N_ID, VERSION_N);
+    HDEVINFO devs = SetupDiGetClassDevs(NULL, NULL, NULL, DIGCF_ALLCLASSES | DIGCF_PRESENT);
+    if (devs != INVALID_HANDLE_VALUE) {
+        SP_DEVINFO_DATA devInfo;
+        devInfo.cbSize = sizeof(devInfo);
+        TCHAR prt[MAX_PATH];
+        for (int devIndex=0; SetupDiEnumDeviceInfo(devs,devIndex,&devInfo); devIndex++) {
+            LPTSTR *hwIds = NULL;
+            if(CM_Get_Device_ID(devInfo.DevInst, vjoy_instance_id, MAX_DEVICE_ID_LEN, 0) != CR_SUCCESS) vjoy_instance_id[0] = TEXT('\0');
+            hwIds = GetDevMultiSz(devs,&devInfo,SPDRP_HARDWAREID);
+            if (!hwIds || !(*hwIds)) continue;
+            int cmp = _tcsnicmp(*hwIds, device_hwid, _tcslen(device_hwid));
+            DelMultiSz((PZPWSTR)hwIds);
+            if (!cmp) return true;
+        }
+        return false;
+    } 
+    return std::nullopt;
+}
+
+static std::optional<bool> install_vjoy_device(const std::filesystem::path &inf_file) {
+    const auto is_already_installed = is_vjoy_installed();
+    if (!is_already_installed || *is_already_installed) return std::nullopt;
+    logger()->info("vJoy device isn't present; Installing... ({})", std::filesystem::absolute(inf_file).string());
+    GUID class_guid;
+    TCHAR class_name[MAX_CLASS_NAME_LEN];
+    if (!SetupDiGetINFClass(std::filesystem::absolute(inf_file).string().data(), &class_guid, class_name, sizeof(class_name) / sizeof(class_name[0]), 0)) {
+        logger()->error("vJoy Installation: Failed to process INF file.");
+        return std::nullopt;
+    }
+    logger()->info("vJoy Installation, Class Name: {}", class_name);
+    HDEVINFO device_info_set = SetupDiCreateDeviceInfoList(&class_guid, NULL);
+    if(device_info_set == INVALID_HANDLE_VALUE) {
+        logger()->error("vJoy Installation: Failed to get device info list.");
+        return std::nullopt;
+    }
+    SP_DEVINFO_DATA device_info_data;
+    memset(&device_info_data, 0, sizeof(SP_DEVINFO_DATA));
+    device_info_data.cbSize = sizeof(SP_DEVINFO_DATA);
+    if (!SetupDiCreateDeviceInfo(device_info_set, class_name, &class_guid, NULL,  0, DICD_GENERATE_ID, &device_info_data)) {
+        logger()->error("vJoy Installation: Failed to get device info.");
+        return std::nullopt;
+    }
+    TCHAR *hwIdList = "root\\VID_1234&PID_BEAD&REV_0221";
+    if(!SetupDiSetDeviceRegistryProperty(device_info_set, &device_info_data, SPDRP_HARDWAREID,(LPBYTE)hwIdList, (lstrlen(hwIdList)+1+1)*sizeof(TCHAR))) {
+        logger()->error("vJoy Installation: Failed to set device registry property.");
+        return std::nullopt;
+    }
+    if (!SetupDiCallClassInstaller(DIF_REGISTERDEVICE, device_info_set, &device_info_data)) {
+        logger()->error("vJoy Installation: Failed to call class installer.");
+        return std::nullopt;
+    }
+    TCHAR instance_id[1000];
+    if (!SetupDiGetDeviceInstanceId(device_info_set, &device_info_data, instance_id, 1000, NULL)) {
+        logger()->error("vJoy Installation: Failed to get device instance ID.");
+        return std::nullopt;
+    }
+    logger()->info("vJoy Installation, Device Instance ID: {}", instance_id);
+    const auto wait_events = CMP_WaitNoPendingInstallEvents(30000);
+    logger()->info("vJoy Installation, Wait Events: {}", wait_events);
+    BOOL reboot = false;
+    const auto newdev_mod = LoadLibrary(TEXT("newdev.dll"));
+    logger()->info("vJoy Installation, NEWDEV module: {}", reinterpret_cast<void *>(newdev_mod));
+    const auto update_pnp = (UpdateDriverForPlugAndPlayDevicesProto)GetProcAddress(newdev_mod, "UpdateDriverForPlugAndPlayDevicesA");
+    logger()->info("vJoy Installation, PNP function: {}", reinterpret_cast<void *>(update_pnp));
+    logger()->info("vJoy Installation, HWID: {}", hwIdList);
+    const auto pnp_status = update_pnp(NULL, hwIdList, std::filesystem::absolute(inf_file).string().data(), INSTALLFLAG_FORCE, &reboot);
+    logger()->info("vJoy Installation, PNP Status: {}", pnp_status);
+    logger()->info("Progress good.");
+    // SetupDiDestroyDeviceInfoList(DeviceInfoSet);
+    return std::nullopt;
+}
+
 std::optional<std::vector<sc::hid::system_hid>> sc::hid::list_devices() {
     if (!populate_vid_pid_to_product_name_map()) return std::nullopt;
     GUID device_interface_guid { };
@@ -293,6 +647,7 @@ std::optional<std::vector<sc::hid::system_hid>> sc::hid::list_devices() {
     std::vector<sc::hid::system_hid> res;
     for (auto &device_instance_path : instances.value()) {
         auto instance_path_chars = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(device_instance_path);
+        logger()->debug("Instance path: {}", instance_path_chars);
         auto vid_i = instance_path_chars.find("\\VID_");
         if (vid_i == std::string::npos) {
             logger()->debug("Unable to find vendor ID within instance path: {}", instance_path_chars);
@@ -312,6 +667,10 @@ std::optional<std::vector<sc::hid::system_hid>> sc::hid::list_devices() {
         } else logger()->debug("Mapped VID/PID to product name: {}/{} -> [{}]", vid, pid, product_name_i->second);
         res.push_back({ instance_path_chars, product_name_i->second });
     }
+    if (const auto installed = is_vjoy_installed(); installed) {
+        spdlog::info("### VJOY INSTALLED ### : {}", *installed);
+    }
+    install_vjoy_device("C:\\Users\\Brandon\\Downloads\\vJoy-2.2.1.1\\x64\\Release\\vjoy.inf");
     return res;
 }
 
