@@ -34,6 +34,8 @@ Revision History:
 #define _PUBLIC_H
 #pragma once
 
+#include <windows.h>
+
 // Compilation directives
 #define PPJOY_MODE
 #undef PPJOY_MODE	// Comment-out for compatibility mode
@@ -54,15 +56,15 @@ DEFINE_GUID(GUID_DEVINTERFACE_VJOY, 0x781EF630, 0x72B2, 0x11d2, 0xB8, 0x52, 0x00
 #ifdef PPJOY_MODE
 #define DEVICENAME_STRING			"PPJoyIOCTL1"
 #else
-#define DEVICENAME_STRING			"Sim Coaches Virtual Joystick"
+#define DEVICENAME_STRING			"vJoy"
 #endif
-#define NTDEVICE_NAME_STRING		"\\Device\\"DEVICENAME_STRING
-#define SYMBOLIC_NAME_STRING		"\\DosDevices\\"DEVICENAME_STRING
-#define	DOS_FILE_NAME				"\\\\.\\"DEVICENAME_STRING
+#define NTDEVICE_NAME_STRING		"\\Device\\" DEVICENAME_STRING
+#define SYMBOLIC_NAME_STRING		"\\DosDevices\\" DEVICENAME_STRING
+#define	DOS_FILE_NAME				"\\\\.\\" DEVICENAME_STRING
 #define VJOY_INTERFACE				L"Device_"
 
 // Use auto-generated version file from inc/
-#include "gen-versioninfo.h"
+#include "vjoy-version.h"
 // This is a hardcoded version, not to be confused with whole {installer+libs+SDK} that
 // use getversion to retrieve a 'git describe' (tag) version.
 // Version parts as a serie of digits (from higher (X) significant number to lower (L))
@@ -128,8 +130,8 @@ DEFINE_GUID(GUID_DEVINTERFACE_VJOY, 0x781EF630, 0x72B2, 0x11d2, 0xB8, 0x52, 0x00
 
 // Device Strings
 //
-#define VENDOR_STR_ID		L"Sim Coaches"
-#define PRODUCT_STR_ID		L"Sim Coaches Virtual Joystick"
+#define VENDOR_STR_ID		L"Shaul Eizikovich"
+#define PRODUCT_STR_ID		L"vJoy - Virtual Joystick"
 #define	SERIALNUMBER_STR	MAKEWIDE(STRINGIFY(VER_X_)) L"." MAKEWIDE(STRINGIFY(VER_H_)) L"." MAKEWIDE(STRINGIFY(VER_M_)) L"."  MAKEWIDE(STRINGIFY(VER_L_))
 
 // Function codes;

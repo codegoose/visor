@@ -21,6 +21,7 @@
 #include "../hidhide/hidhide.h"
 #include "../boot/gl-proc-address.h"
 #include "../font/imgui.h"
+#include "../vjoy/vjoy-interface.h""
 
 using namespace gl;
 
@@ -88,6 +89,8 @@ int main() {
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     SDL_JoystickEventState(SDL_ENABLE);
     sc::hidhide::list_devices();
+    int num;
+    GetNumberExistingVJD(&num);
     for (;;) {
         {
             bool should_quit = false;

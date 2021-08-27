@@ -4,19 +4,13 @@
 // that uses this DLL. This way any other project whose source files include this file see 
 // VJOYINTERFACE_API functions as being imported from a DLL, whereas this DLL sees symbols
 // defined with this macro as being exported.
-#ifdef VJOYINTERFACE_EXPORTS
-#define VJOYINTERFACE_API __declspec(dllexport)
-#else
-#define VJOYINTERFACE_API __declspec(dllimport)
-#endif
 
-#ifdef STATIC
-#undef VJOYINTERFACE_API
+#pragma once
+
 #define VJOYINTERFACE_API
-#endif
 
 // Add vJoy driver's own public defines (IOCtl, HID, memory structs like JOYSTICK_POSITION_V2)
-#include "public.h"
+#include "vjoy.h"
 // For data alignment, see https://en.wikipedia.org/wiki/Data_structure_alignment#Typical_alignment_of_C_structs_on_x86
 
 ///////////////////////////// vJoy device (collection) status ////////////////////////////////////////////
@@ -174,10 +168,10 @@ enum FFB_CTRL : UINT32
 {
     CTRL_ENACT = 1,	// Enable all device actuators.
     CTRL_DISACT = 2,	// Disable all the device actuators.
-    CTRL_STOPALL = 3,	// Stop All Effects� Issues a stop on every running effect.
-    CTRL_DEVRST = 4,	// Device Reset� Clears any device paused condition, enables all actuators and clears all effects from memory.
-    CTRL_DEVPAUSE = 5,	// Device Pause� The all effects on the device are paused at the current time step.
-    CTRL_DEVCONT = 6,	// Device Continue� The all effects that running when the device was paused are restarted from their last time step.
+    CTRL_STOPALL = 3,	// Stop All Effects­ Issues a stop on every running effect.
+    CTRL_DEVRST = 4,	// Device Reset– Clears any device paused condition, enables all actuators and clears all effects from memory.
+    CTRL_DEVPAUSE = 5,	// Device Pause– The all effects on the device are paused at the current time step.
+    CTRL_DEVCONT = 6,	// Device Continue– The all effects that running when the device was paused are restarted from their last time step.
 };
 
 enum FFB_EFFECTS : UINT32
@@ -228,10 +222,10 @@ typedef struct _FFB_EFF_REPORT {
     BYTE		TrigerBtn;
     BYTE		AxesEnabledDirection;
 
-    BOOL		Polar; // How to interpret force direction Polar (0-360�) or Cartesian (X,Y)
+    BOOL		Polar; // How to interpret force direction Polar (0-360°) or Cartesian (X,Y)
     union
     {
-        WORD	Direction; // Polar direction: (0x00-0x7FFF correspond to 0-360�)
+        WORD	Direction; // Polar direction: (0x00-0x7FFF correspond to 0-360°)
         WORD	DirX; // X direction: Positive values are To the right of the center (X); Negative are Two's complement
     };
     WORD		DirY; // Y direction: Positive values are below the center (Y); Negative are Two's complement
@@ -251,7 +245,7 @@ typedef struct _FFB_EFF_PERIOD {
     BYTE		EffectBlockIndex;
 
     DWORD		Magnitude;			// Range: 0 - 10000
-    LONG 		Offset;				// Range: �10000 - 10000
+    LONG 		Offset;				// Range: –10000 - 10000
     DWORD 		Phase;				// Range: 0 - 35999
     DWORD 		Period;				// Range: 0 - 32767
 } FFB_EFF_PERIOD, * PFFB_EFF_PERIOD;
@@ -260,12 +254,12 @@ typedef struct _FFB_EFF_COND {
     BYTE		EffectBlockIndex;
 
     BOOL		isY;
-    LONG 		CenterPointOffset; // CP Offset:  Range -�10000 �- 10000
-    LONG 		PosCoeff; // Positive Coefficient: Range -�10000 �- 10000
-    LONG 		NegCoeff; // Negative Coefficient: Range -�10000 �- 10000
-    DWORD 		PosSatur; // Positive Saturation: Range 0 � 10000
-    DWORD 		NegSatur; // Negative Saturation: Range 0 � 10000
-    LONG 		DeadBand; // Dead Band: : Range 0 � 1000
+    LONG 		CenterPointOffset; // CP Offset:  Range -­10000 ­- 10000
+    LONG 		PosCoeff; // Positive Coefficient: Range -­10000 ­- 10000
+    LONG 		NegCoeff; // Negative Coefficient: Range -­10000 ­- 10000
+    DWORD 		PosSatur; // Positive Saturation: Range 0 – 10000
+    DWORD 		NegSatur; // Negative Saturation: Range 0 – 10000
+    LONG 		DeadBand; // Dead Band: : Range 0 – 1000
 } FFB_EFF_COND, * PFFB_EFF_COND;
 
 typedef struct _FFB_EFF_ENVLP {
