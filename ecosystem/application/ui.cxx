@@ -10,8 +10,8 @@
 
 #include "application.h"
 
-#include "../common/font_awesome_5.h"
-#include "../common/font_awesome_5_brands.h"
+#include "../font/font_awesome_5.h"
+#include "../font/font_awesome_5_brands.h"
 
 glm::dvec2 coords_to_screen(const glm::dvec2 &in, const glm::dvec2 &min, const glm::dvec2 &size) {
     return {

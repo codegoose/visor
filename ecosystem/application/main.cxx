@@ -12,14 +12,14 @@
 
 #include "application.h"
 
-#include "../common/imgui_impl_sdl.h"
-#include "../common/imgui_impl_opengl3.h"
-#include "../common/imgui_freetype.h"
-#include "../common/imgui_utils.hpp"
-#include "../common/defer.h"
-#include "../common/font_awesome_5.h"
-#include "../common/font_awesome_5_brands.h"
-#include "../common/hid.h"
+#include "../imgui/imgui_impl_sdl.h"
+#include "../imgui/imgui_impl_opengl3.h"
+#include "../imgui/imgui_freetype.h"
+#include "../imgui/imgui_utils.hpp"
+#include "../defer.h"
+#include "../font/font_awesome_5.h"
+#include "../font/font_awesome_5_brands.h"
+#include "../hidhide/hidhide.h"
 
 using namespace gl;
 
@@ -118,7 +118,7 @@ int main() {
     ImFreetypeEnablement freetype;
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     SDL_JoystickEventState(SDL_ENABLE);
-    sc::hid::list_devices();
+    sc::hidhide::list_devices();
     for (;;) {
         {
             bool should_quit = false;

@@ -1,9 +1,3 @@
-#include "vjoy-pub-2-1-9-1.h"
-
-#define	VJOY_HWID_TMPLT TEXT("root\\VID_%04X&PID_%04X&REV_%04X")
-
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
-
 #include <spdlog/spdlog.h>
 
 #define DIRECTINPUT_VERSION 0x0800
@@ -12,7 +6,7 @@
 #include <dinput.h>
 #include <newdev.h>
 
-#include "hid.h"
+#include "hidhide.h"
 
 #include <stdio.h>
 
@@ -57,7 +51,7 @@ static auto logger() {
     return spdlog::default_logger();
 }
 
-namespace sc::hid {
+namespace sc::hidhide {
 
     std::optional<ptr_closehandle> get_device_handle() {
         const DWORD share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
@@ -370,54 +364,13 @@ namespace sc::hid {
     }
 
     static BOOL CALLBACK di8_enum_device_callback(const DIDEVICEINSTANCE *di, void *user) {
-        if (auto product_guid = sc::hid::convert_guid_to_string(di->guidProduct); product_guid.has_value() && product_guid->size() == 38) {
+        if (auto product_guid = sc::hidhide::convert_guid_to_string(di->guidProduct); product_guid.has_value() && product_guid->size() == 38) {
             auto guid_str = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(product_guid->data());
             auto pid = guid_str.substr(1, 4);
             auto vid = guid_str.substr(5, 4);
             if (vid_pid_product_map.find({ vid, pid }) == vid_pid_product_map.end()) {
                 logger()->debug("New product mapping: VID [{}], PID [{}] -> NAME [{}] (GUID [{}])", vid, pid, di->tszProductName, guid_str);
                 vid_pid_product_map[{ vid, pid }] = di->tszProductName;
-                /*
-                logger()->critical("---");
-                if (DIDFT_GETTYPE(di->dwDevType) & DIDFT_AXIS) {
-                    logger()->critical("Device is axis: {}", di->tszProductName);
-                }
-                if (DIDFT_GETTYPE(di->dwDevType) & DIDFT_BUTTON) {
-                    logger()->critical("Device is button: {}", di->tszProductName);
-                }
-                if (DIDFT_GETTYPE(di->dwDevType) & DIDFT_POV) {
-                    logger()->critical("Device is hat: {}", di->tszProductName);
-                }
-                const bool supports_xinput = di8_supports_xinput(&di->guidProduct);
-                if (!supports_xinput) {
-                    logger()->info("Xinput: {}", supports_xinput);
-                    if (IDirectInputDevice8 *device = nullptr; SUCCEEDED(IDirectInput8_CreateDevice(direct_input_8_context, di->guidInstance, &device, nullptr))) {
-                        if (SUCCEEDED(IDirectInputDevice8_SetDataFormat(device, &direct_input_8_data_format))) {
-                            DIDEVCAPS capabilities;
-                            memset(&capabilities, 0, sizeof(DIDEVCAPS));
-                            capabilities.dwSize = sizeof(DIDEVCAPS);
-                            if (SUCCEEDED(IDirectInputDevice8_GetCapabilities(device, &capabilities))) {
-                                DIPROPDWORD dipd;
-                                memset(&dipd, 0, sizeof(DIPROPDWORD));
-                                dipd.diph.dwSize = sizeof(dipd);
-                                dipd.diph.dwHeaderSize = sizeof(dipd.diph);
-                                dipd.diph.dwHow = DIPH_DEVICE;
-                                dipd.dwData = DIPROPAXISMODE_ABS;
-                                if (SUCCEEDED(IDirectInputDevice8_SetProperty(device, DIPROP_AXISMODE, &dipd.diph))) {
-                                    logger()->critical("{} axes, {} buttons, {} hats", capabilities.dwAxes, capabilities.dwButtons, capabilities.dwPOVs);
-                                    di8_object obj;
-                                    obj.device = device;
-                                    if (SUCCEEDED(IDirectInputDevice8_EnumObjects(device, di8_enum_device_objects, &obj, DIDFT_AXIS | DIDFT_BUTTON | DIDFT_POV))) {
-                                        logger()->critical("Got device.");
-                                    }
-                                }
-                            }
-                        }
-                        device->Release();
-                    } else logger()->critical("Failed to create device.");
-                } else logger()->critical("Xinput: {}", supports_xinput);
-                logger()->critical("--- eod");
-                */
             }
         } else logger()->warn("Failed to resolve VID/PID of device: {}", di->tszProductName);
         return DIENUM_CONTINUE;
@@ -436,7 +389,7 @@ namespace sc::hid {
     }
 }
 
-std::optional<std::vector<std::string>> sc::hid::get_blacklist() {
+std::optional<std::vector<std::string>> sc::hidhide::get_blacklist() {
     auto handle = get_device_handle();
     if (!handle.has_value()) return std::nullopt;
     DWORD num_bytes_needed { };
@@ -448,7 +401,7 @@ std::optional<std::vector<std::string>> sc::hid::get_blacklist() {
     return res;
 }
 
-std::optional<std::vector<std::filesystem::path>> sc::hid::get_whitelist() {
+std::optional<std::vector<std::filesystem::path>> sc::hidhide::get_whitelist() {
     auto handle = get_device_handle();
     if (!handle.has_value()) return std::nullopt;
     DWORD num_bytes_needed { };
@@ -458,7 +411,7 @@ std::optional<std::vector<std::filesystem::path>> sc::hid::get_whitelist() {
     return string_list_to_path_list(multi_string_to_string_list(buffer));
 }
 
-bool sc::hid::set_blacklist(const std::vector<std::string> &new_list) {
+bool sc::hidhide::set_blacklist(const std::vector<std::string> &new_list) {
     auto handle = get_device_handle();
     if (!handle.has_value()) return false;
     DWORD num_bytes_needed;
@@ -470,7 +423,7 @@ bool sc::hid::set_blacklist(const std::vector<std::string> &new_list) {
     return true;
 }
 
-bool sc::hid::set_whitelist(const std::vector<std::filesystem::path> &new_list) {
+bool sc::hidhide::set_whitelist(const std::vector<std::filesystem::path> &new_list) {
     auto handle = get_device_handle();
     if (!handle.has_value()) return false;
     DWORD num_bytes_needed;
@@ -486,165 +439,13 @@ bool sc::hid::set_whitelist(const std::vector<std::filesystem::path> &new_list) 
     return true;
 }
 
-LPTSTR * GetMultiSzIndexArray(__in __drv_aliasesMem LPTSTR MultiSz) {
-    LPTSTR scan;
-    LPTSTR * array;
-    int elements;
-
-    for(scan = MultiSz, elements = 0; scan[0] ;elements++) {
-        scan += lstrlen(scan)+1;
-    }
-    array = new LPTSTR[elements+2];
-    if(!array) {
-        return NULL;
-    }
-    array[0] = MultiSz;
-    array++;
-    if(elements) {
-        for(scan = MultiSz, elements = 0; scan[0]; elements++) {
-            array[elements] = scan;
-            scan += lstrlen(scan)+1;
-        }
-    }
-    array[elements] = NULL;
-    return array;
-}
-
-LPTSTR * GetDevMultiSz(__in HDEVINFO Devs, __in PSP_DEVINFO_DATA DevInfo, __in DWORD Prop) {
-    LPTSTR buffer = NULL;
-    DWORD reqSize = 16000;
-    DWORD dataType;
-    LPTSTR * array;
-    DWORD szChars;
-	BOOL bRes;
-
-
-	// Getting the size of required buffer
-#if 0
-	bRegProp = SetupDiGetDeviceRegistryProperty(Devs, DevInfo, Prop, NULL, NULL, 0, &reqSize);
-	DWORD err = GetLastError();
-	if (err != ERROR_INSUFFICIENT_BUFFER)
-		return NULL;
-
-#endif // 0
-
-
-	// Allocate buffer according to required size
-    buffer = new TCHAR[(reqSize /sizeof(TCHAR))+2];
-    if(!buffer)
-		return NULL;
-
-	// Get the string into the buffer 
-	bRes = SetupDiGetDeviceRegistryProperty(Devs, DevInfo, Prop, &dataType, (LPBYTE)buffer, reqSize, &reqSize);
-	if (!bRes || ((dataType != REG_SZ) && (dataType != REG_MULTI_SZ)))
-		return NULL;
-
-	szChars = reqSize / sizeof(TCHAR);
-	buffer[szChars] = TEXT('\0');
-	buffer[szChars + 1] = TEXT('\0');
-	array = GetMultiSzIndexArray(buffer);
-    if(array)
-        return array;
-
-    if(buffer) {
-        delete [] buffer;
-    }
-    return NULL;
-}
-
-void DelMultiSz(__in_opt __drv_freesMem(object) PZPWSTR Array) {
-        if(Array) {
-        Array--;
-        if(Array[0]) {
-            delete [] Array[0];
-        }
-        delete [] Array;
-    }
-}
-
-static std::optional<bool> is_vjoy_installed() {
-    TCHAR vjoy_instance_id[MAX_DEVICE_ID_LEN];
-    TCHAR device_hwid[MAX_PATH];
-    _stprintf_s(device_hwid, MAX_PATH, VJOY_HWID_TMPLT,VENDOR_N_ID, PRODUCT_N_ID, VERSION_N);
-    HDEVINFO devs = SetupDiGetClassDevs(NULL, NULL, NULL, DIGCF_ALLCLASSES | DIGCF_PRESENT);
-    if (devs != INVALID_HANDLE_VALUE) {
-        SP_DEVINFO_DATA devInfo;
-        devInfo.cbSize = sizeof(devInfo);
-        TCHAR prt[MAX_PATH];
-        for (int devIndex=0; SetupDiEnumDeviceInfo(devs,devIndex,&devInfo); devIndex++) {
-            LPTSTR *hwIds = NULL;
-            if(CM_Get_Device_ID(devInfo.DevInst, vjoy_instance_id, MAX_DEVICE_ID_LEN, 0) != CR_SUCCESS) vjoy_instance_id[0] = TEXT('\0');
-            hwIds = GetDevMultiSz(devs,&devInfo,SPDRP_HARDWAREID);
-            if (!hwIds || !(*hwIds)) continue;
-            int cmp = _tcsnicmp(*hwIds, device_hwid, _tcslen(device_hwid));
-            DelMultiSz((PZPWSTR)hwIds);
-            if (!cmp) return true;
-        }
-        return false;
-    } 
-    return std::nullopt;
-}
-
-static std::optional<bool> install_vjoy_device(const std::filesystem::path &inf_file) {
-    const auto is_already_installed = is_vjoy_installed();
-    if (!is_already_installed || *is_already_installed) return std::nullopt;
-    logger()->info("vJoy device isn't present; Installing... ({})", std::filesystem::absolute(inf_file).string());
-    GUID class_guid;
-    TCHAR class_name[MAX_CLASS_NAME_LEN];
-    if (!SetupDiGetINFClass(std::filesystem::absolute(inf_file).string().data(), &class_guid, class_name, sizeof(class_name) / sizeof(class_name[0]), 0)) {
-        logger()->error("vJoy Installation: Failed to process INF file.");
-        return std::nullopt;
-    }
-    logger()->info("vJoy Installation, Class Name: {}", class_name);
-    HDEVINFO device_info_set = SetupDiCreateDeviceInfoList(&class_guid, NULL);
-    if(device_info_set == INVALID_HANDLE_VALUE) {
-        logger()->error("vJoy Installation: Failed to get device info list.");
-        return std::nullopt;
-    }
-    SP_DEVINFO_DATA device_info_data;
-    memset(&device_info_data, 0, sizeof(SP_DEVINFO_DATA));
-    device_info_data.cbSize = sizeof(SP_DEVINFO_DATA);
-    if (!SetupDiCreateDeviceInfo(device_info_set, class_name, &class_guid, NULL,  0, DICD_GENERATE_ID, &device_info_data)) {
-        logger()->error("vJoy Installation: Failed to get device info.");
-        return std::nullopt;
-    }
-    TCHAR *hwIdList = "root\\VID_1234&PID_BEAD&REV_0221";
-    if(!SetupDiSetDeviceRegistryProperty(device_info_set, &device_info_data, SPDRP_HARDWAREID,(LPBYTE)hwIdList, (lstrlen(hwIdList)+1+1)*sizeof(TCHAR))) {
-        logger()->error("vJoy Installation: Failed to set device registry property.");
-        return std::nullopt;
-    }
-    if (!SetupDiCallClassInstaller(DIF_REGISTERDEVICE, device_info_set, &device_info_data)) {
-        logger()->error("vJoy Installation: Failed to call class installer.");
-        return std::nullopt;
-    }
-    TCHAR instance_id[1000];
-    if (!SetupDiGetDeviceInstanceId(device_info_set, &device_info_data, instance_id, 1000, NULL)) {
-        logger()->error("vJoy Installation: Failed to get device instance ID.");
-        return std::nullopt;
-    }
-    logger()->info("vJoy Installation, Device Instance ID: {}", instance_id);
-    const auto wait_events = CMP_WaitNoPendingInstallEvents(30000);
-    logger()->info("vJoy Installation, Wait Events: {}", wait_events);
-    BOOL reboot = false;
-    const auto newdev_mod = LoadLibrary(TEXT("newdev.dll"));
-    logger()->info("vJoy Installation, NEWDEV module: {}", reinterpret_cast<void *>(newdev_mod));
-    const auto update_pnp = (UpdateDriverForPlugAndPlayDevicesProto)GetProcAddress(newdev_mod, "UpdateDriverForPlugAndPlayDevicesA");
-    logger()->info("vJoy Installation, PNP function: {}", reinterpret_cast<void *>(update_pnp));
-    logger()->info("vJoy Installation, HWID: {}", hwIdList);
-    const auto pnp_status = update_pnp(NULL, hwIdList, std::filesystem::absolute(inf_file).string().data(), INSTALLFLAG_FORCE, &reboot);
-    logger()->info("vJoy Installation, PNP Status: {}", pnp_status);
-    logger()->info("Progress good.");
-    // SetupDiDestroyDeviceInfoList(DeviceInfoSet);
-    return std::nullopt;
-}
-
-std::optional<std::vector<sc::hid::system_hid>> sc::hid::list_devices() {
+std::optional<std::vector<sc::hidhide::system_hid>> sc::hidhide::list_devices() {
     if (!populate_vid_pid_to_product_name_map()) return std::nullopt;
     GUID device_interface_guid { };
     HidD_GetHidGuid(&device_interface_guid);
     auto instances = get_device_instance_paths_through_filter(GUID_DEVCLASS_HIDCLASS);
     if (!instances.has_value()) return std::nullopt;
-    std::vector<sc::hid::system_hid> res;
+    std::vector<sc::hidhide::system_hid> res;
     for (auto &device_instance_path : instances.value()) {
         auto instance_path_chars = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(device_instance_path);
         logger()->debug("Instance path: {}", instance_path_chars);
@@ -667,18 +468,14 @@ std::optional<std::vector<sc::hid::system_hid>> sc::hid::list_devices() {
         } else logger()->debug("Mapped VID/PID to product name: {}/{} -> [{}]", vid, pid, product_name_i->second);
         res.push_back({ instance_path_chars, product_name_i->second });
     }
-    if (const auto installed = is_vjoy_installed(); installed) {
-        spdlog::info("### VJOY INSTALLED ### : {}", *installed);
-    }
-    install_vjoy_device("C:\\Users\\Brandon\\Downloads\\vJoy-2.2.1.1\\x64\\Release\\vjoy.inf");
     return res;
 }
 
-bool sc::hid::present() {
+bool sc::hidhide::present() {
     return get_device_handle().has_value();
 }
 
-bool sc::hid::is_enabled() {
+bool sc::hidhide::is_enabled() {
     auto handle = get_device_handle();
     if (!handle.has_value()) return false;
     DWORD num_bytes_needed;
@@ -694,7 +491,7 @@ bool sc::hid::is_enabled() {
     return buffer.at(0) != FALSE;
 }
 
-bool sc::hid::set_enabled(bool enabled) {
+bool sc::hidhide::set_enabled(bool enabled) {
     auto handle = get_device_handle();
     if (!handle.has_value()) return false;
     DWORD num_bytes_needed;

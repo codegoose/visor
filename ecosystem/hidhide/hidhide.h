@@ -5,7 +5,7 @@
 #include <string>
 #include <filesystem>
 
-namespace sc::hid {
+namespace sc::hidhide {
     
     bool present();
     bool is_enabled();
