@@ -13,16 +13,9 @@ target_link_libraries(visor
     CONAN_PKG::imgui
     CONAN_PKG::freetype
 
+    boot
     imgui
     hidhide
-
-    # HID stuff
-
-    dinput8
-    dxguid
-    hid
-    advapi32
-    ole32
-    cfgmgr32
-    setupapi
+    font
+    vjoy
 )

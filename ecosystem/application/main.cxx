@@ -16,49 +16,16 @@
 #include "../imgui/imgui_impl_opengl3.h"
 #include "../imgui/imgui_freetype.h"
 #include "../imgui/imgui_utils.hpp"
-#include "../defer.h"
-#include "../font/font_awesome_5.h"
-#include "../font/font_awesome_5_brands.h"
+#include "../defer.hpp"
+#include "../expected.hpp"
 #include "../hidhide/hidhide.h"
+#include "../boot/gl-proc-address.h"
+#include "../font/imgui.h"
 
 using namespace gl;
 
-static std::function<glbinding::ProcAddress(const char*)> sc_get_proc_address = [](const char *name) -> glbinding::ProcAddress {
-    const auto addr = SDL_GL_GetProcAddress(name);
-    const auto text = fmt::format("GL: {} @ {}", name, reinterpret_cast<void *>(addr));
-    if (addr) spdlog::debug(text);
-    else {
-        spdlog::error(text);
-        exit(1000);
-    }
-    return reinterpret_cast<glbinding::ProcAddress>(addr);
-};
-
 static const bool prepare_styling() {
-    if (!ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\seguisb.ttf", 16)) {
-        spdlog::critical("Unable to load primary font.");
-        return false;
-    }
-    {
-        static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-        ImFontConfig icons_config;
-        icons_config.MergeMode = true;
-        icons_config.PixelSnapH = true;
-        if (!ImGui::GetIO().Fonts->AddFontFromFileTTF( FONT_ICON_FILE_NAME_FAS, 12, &icons_config, icons_ranges)) {
-            spdlog::critical("Unable to load secondary font.");
-            return false;
-        }
-    }
-    {
-        static const ImWchar icons_ranges[] = { ICON_MIN_FAB, ICON_MAX_FAB, 0 };
-        ImFontConfig icons_config;
-        icons_config.MergeMode = true;
-        icons_config.PixelSnapH = true;
-        if (!ImGui::GetIO().Fonts->AddFontFromFileTTF( FONT_ICON_FILE_NAME_FAB, 12, &icons_config, icons_ranges)) {
-            spdlog::critical("Unable to load tertiary font.");
-            return false;
-        }
-    }
+    sc::font::imgui::load(16);
     auto &style = ImGui::GetStyle();
     style.WindowBorderSize = 1;
     style.FrameBorderSize = 1;
@@ -74,6 +41,8 @@ int main() {
     spdlog::set_level(spdlog::level::debug);
     const glm::ivec2 initial_framebuffer_size { 932, 768 };
     DEFER({
+        spdlog::debug("Terminating SDL subsystems...");
+        SDL_QuitSubSystem(SDL_INIT_EVERYTHING);
         spdlog::debug("Terminating SDL...");
         SDL_Quit();
     });
@@ -82,7 +51,7 @@ int main() {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    const auto window = SDL_CreateWindow("Visor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, initial_framebuffer_size.x, initial_framebuffer_size.y, SDL_WINDOW_OPENGL);
+    const auto window = SDL_CreateWindow("Visor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, initial_framebuffer_size.x, initial_framebuffer_size.y, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
     if (!window) return 2;
     DEFER({
         spdlog::debug("Destroying main window...");
@@ -95,7 +64,7 @@ int main() {
         SDL_GL_DeleteContext(gl_context);
     });
     if (SDL_GL_MakeCurrent(window, gl_context) != 0) return 4;
-    glbinding::initialize(sc_get_proc_address, false);
+    glbinding::initialize(sc::boot::gl::get_proc_address, false);
     spdlog::info("GL: {} ({})", glGetString(GL_VERSION), glGetString(GL_RENDERER));
     const auto imgui_ctx = ImGui::CreateContext();
     if (!imgui_ctx) return 5;
@@ -164,7 +133,10 @@ int main() {
                     spdlog::info("JOY removed: #{}", event.jdevice.which);
                 }
             }
-            if (should_quit) break;
+            if (should_quit) {
+                SDL_HideWindow(window);
+                break;
+            }
         }
         const auto hz = [&]() -> std::optional<int> {
             const auto display_i = SDL_GetWindowDisplayIndex(window);
@@ -208,6 +180,11 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(draw_data);
         SDL_GL_SwapWindow(window);
+        if (static bool shown_window = false; !shown_window) {
+            spdlog::debug("First render complete. Making window visible.");
+            SDL_ShowWindow(window);
+            shown_window = true;
+        }
     }
     return 0;
 }
