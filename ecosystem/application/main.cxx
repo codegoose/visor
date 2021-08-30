@@ -1,10 +1,19 @@
+#define WIN32_LEAN_AND_MEAN
+#define SDL_MAIN_HANDLED
+
+#include <windows.h>
+
+#undef min
+#undef max
+
 #include <optional>
 #include <vector>
 #include <string_view>
+#include <sstream>
+#include <functional>
 #include <glm/vec2.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/bin_to_hex.h>
-#define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <glbinding/glbinding.h>
 #include <glbinding/gl33core/gl.h>
@@ -21,12 +30,13 @@
 #include "../hidhide/hidhide.h"
 #include "../boot/gl-proc-address.h"
 #include "../font/imgui.h"
-#include "../vjoy/vjoy-interface.h""
+
+#include "../vigem/Client.h"
 
 using namespace gl;
 
-static const bool prepare_styling() {
-    sc::font::imgui::load(16);
+static std::optional<std::string> prepare_styling() {
+    if (!sc::font::imgui::load(16)) return "Failed to load fonts.";
     auto &style = ImGui::GetStyle();
     style.WindowBorderSize = 1;
     style.FrameBorderSize = 1;
@@ -34,10 +44,10 @@ static const bool prepare_styling() {
     style.ChildRounding = 3.f;
     style.ScrollbarRounding = 3.f;
     style.WindowRounding = 3.f;
-    return true;
+    return std::nullopt;
 }
 
-int main() {
+std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SDL_Window *, ImGuiContext *, PVIGEM_CLIENT, PVIGEM_TARGET)> success_cb) {
     SDL_SetMainReady();
     spdlog::set_level(spdlog::level::debug);
     const glm::ivec2 initial_framebuffer_size { 932, 768 };
@@ -48,50 +58,96 @@ int main() {
         SDL_Quit();
     });
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) return 1;
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) return "Failed to initialize SDL.";
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    const auto window = SDL_CreateWindow("Visor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, initial_framebuffer_size.x, initial_framebuffer_size.y, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
-    if (!window) return 2;
+    const auto sdl_window = SDL_CreateWindow("Visor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, initial_framebuffer_size.x, initial_framebuffer_size.y, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+    if (!sdl_window) return "Failed to create window.";
     DEFER({
         spdlog::debug("Destroying main window...");
-        SDL_DestroyWindow(window);
+        SDL_DestroyWindow(sdl_window);
     });
-    const auto gl_context = SDL_GL_CreateContext(window);
-    if (!gl_context) return 3;
+    const auto gl_context = SDL_GL_CreateContext(sdl_window);
+    if (!gl_context) return "Failed to create OpenGL context.";
     DEFER({
         spdlog::debug("Destroying GL context...");
         SDL_GL_DeleteContext(gl_context);
     });
-    if (SDL_GL_MakeCurrent(window, gl_context) != 0) return 4;
+    if (SDL_GL_MakeCurrent(sdl_window, gl_context) != 0) return "Failed to activate OpenGL context";
     glbinding::initialize(sc::boot::gl::get_proc_address, false);
-    spdlog::info("GL: {} ({})", glGetString(GL_VERSION), glGetString(GL_RENDERER));
+    spdlog::debug("GL: {} ({})", glGetString(GL_VERSION), glGetString(GL_RENDERER));
     const auto imgui_ctx = ImGui::CreateContext();
-    if (!imgui_ctx) return 5;
+    if (!imgui_ctx) return "Failed to create ImGui context.";
     DEFER({
         spdlog::debug("Destroying ImGui context...");
         ImGui::DestroyContext(imgui_ctx);
     });
-    if (!ImGui_ImplSDL2_InitForOpenGL(window, gl_context)) return 6;
+    if (!ImGui_ImplSDL2_InitForOpenGL(sdl_window, gl_context)) return "Failed to prepare ImGui SDL implementation.";
     DEFER({
         spdlog::debug("Shutting down ImGui SDL...");
         ImGui_ImplSDL2_Shutdown();
     });
-    if (!ImGui_ImplOpenGL3_Init("#version 130")) return 7;
+    if (!ImGui_ImplOpenGL3_Init("#version 130")) return "Failed to prepare ImGui OpenGL implementation.";
     DEFER({
         spdlog::debug("Shutting down ImGui OpenGL3...");
         ImGui_ImplOpenGL3_Shutdown();
     });
-    if (!prepare_styling()) return 8;
-    ImDrawCompare drawCmp;
+    if (const auto styling_err = prepare_styling(); styling_err.has_value()) return styling_err;
+    const auto vigem_client = vigem_alloc();
+    if (vigem_client == nullptr) return "Failed to allocate memory for ViGEm.";
+    spdlog::debug("ViGEM client: {}", reinterpret_cast<void *>(vigem_client));
+    DEFER({
+        spdlog::debug("Freeing ViGEm client...");
+        vigem_free(vigem_client);
+    });
+    const auto vigem_connect_status = vigem_connect(vigem_client);
+    if (!VIGEM_SUCCESS(vigem_connect_status)) return "Failed to connect to ViGEm.";
+    DEFER({
+        spdlog::debug("Disconnecting ViGEm client...");
+        vigem_disconnect(vigem_client);
+    });
+    const auto vigem_pad = vigem_target_x360_alloc();
+    if (vigem_pad == nullptr) return "Failed to allocate memory for ViGEm gamepad.";
+    DEFER({
+        spdlog::debug("Freeing ViGEm gamepad...");
+        vigem_target_free(vigem_pad);
+    });
+    if (!VIGEM_SUCCESS(vigem_target_add(vigem_client, vigem_pad))) return "Failed to initialize ViGEm gamepad.";
+    DEFER({
+        spdlog::debug("Unplugging ViGEm gamepad...");
+        vigem_target_remove(vigem_client, vigem_pad);
+    });
+    spdlog::info("Bootstrapping completed.");
+    if (const auto cb_err = success_cb(sdl_window, imgui_ctx, vigem_client, vigem_pad); cb_err.has_value()) {
+        spdlog::warn("Bootstrap success routine returned an error: {}", *cb_err);
+        return cb_err;
+    }
+    return std::nullopt;
+}
+
+static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgui_ctx, PVIGEM_CLIENT vigem_client, PVIGEM_TARGET vigem_pad) {
+    ImDrawCompare im_draw_cache;
     ImFreetypeEnablement freetype;
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     SDL_JoystickEventState(SDL_ENABLE);
-    sc::hidhide::list_devices();
-    int num;
-    GetNumberExistingVJD(&num);
+    XUSB_REPORT report;
+    report.bLeftTrigger = 0;
+    report.bRightTrigger = 0;
+    report.sThumbLX = 0;
+    report.sThumbLY = 0;
+    report.sThumbRX = 0;
+    report.sThumbRY = 0;
+    report.wButtons = 0;
     for (;;) {
+        report.bLeftTrigger = rand() % 255;
+        report.bRightTrigger = rand() % 255;
+        // report.sThumbLX = -10000 + (rand() % 20000);
+        // report.sThumbLY = -10000 + (rand() % 20000);
+        // report.sThumbRX = -10000 + (rand() % 20000);
+        // report.sThumbRY = -10000 + (rand() % 20000);
+        if (!VIGEM_SUCCESS(vigem_target_x360_update(vigem_client, vigem_pad, report))) return "Failed to update ViGEm gamepad.";
+        fmt::print("{}, {}\n", report.bLeftTrigger, report.bRightTrigger);
         {
             bool should_quit = false;
             SDL_Event event;
@@ -99,7 +155,7 @@ int main() {
                 if (event.type == SDL_QUIT) {
                     spdlog::critical("Got quit event.");
                     should_quit = true;
-                } else if (event.type == SDL_JOYAXISMOTION) {
+                } /* else if (event.type == SDL_JOYAXISMOTION) {
                     spdlog::info("JOY axis: {}, {}, {}", event.jaxis.which, event.jaxis.axis, static_cast<int>(event.jaxis.value) + 32768);
                 } else if (event.type == SDL_JOYHATMOTION) {
                     spdlog::info("JOY hat: {}, {}, {}", event.jhat.which, event.jhat.hat, event.jhat.value);
@@ -134,15 +190,15 @@ int main() {
                     fmt::print("\n");
                 } else if (event.type == SDL_JOYDEVICEREMOVED) {
                     spdlog::info("JOY removed: #{}", event.jdevice.which);
-                }
+                } */
             }
             if (should_quit) {
-                SDL_HideWindow(window);
+                SDL_HideWindow(sdl_window);
                 break;
             }
         }
         const auto hz = [&]() -> std::optional<int> {
-            const auto display_i = SDL_GetWindowDisplayIndex(window);
+            const auto display_i = SDL_GetWindowDisplayIndex(sdl_window);
             if (display_i < 0) return 60;
             SDL_DisplayMode mode;
             if (SDL_GetCurrentDisplayMode(display_i, &mode) != 0) return 60;
@@ -155,7 +211,7 @@ int main() {
         }
         const auto current_framebuffer_size = [&]() -> glm::ivec2 {
             int dw, dh;
-            SDL_GL_GetDrawableSize(window, &dw, &dh);
+            SDL_GL_GetDrawableSize(sdl_window, &dw, &dh);
             return { dw, dh };
         }();
         freetype.preNewFrame();
@@ -165,7 +221,7 @@ int main() {
         sc::visor::emit_ui(current_framebuffer_size);
         ImGui::Render();
         const auto draw_data = ImGui::GetDrawData();
-        const bool draw_data_changed = !drawCmp.Check(draw_data);
+        const bool draw_data_changed = !im_draw_cache.Check(draw_data);
         const bool framebuffer_size_changed = (current_framebuffer_size.x != recent_framebuffer_size.x || current_framebuffer_size.y != recent_framebuffer_size.y);
         const bool needRedraw = framebuffer_size_changed || draw_data_changed;
         if (!needRedraw) {
@@ -182,12 +238,25 @@ int main() {
         glClearColor(.4, .6, .8, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(draw_data);
-        SDL_GL_SwapWindow(window);
+        SDL_GL_SwapWindow(sdl_window);
         if (static bool shown_window = false; !shown_window) {
             spdlog::debug("First render complete. Making window visible.");
-            SDL_ShowWindow(window);
+            SDL_ShowWindow(sdl_window);
             shown_window = true;
         }
+    }
+    return std::nullopt;
+}
+
+int main() {
+    if (const auto err = bootstrap(run); err.has_value()) {
+        spdlog::error("An error has occurred: {}", *err);
+        std::stringstream ss;
+        ss << "This program experienced an error and was unable to continue running:";
+        ss << std::endl << std::endl;
+        ss << err.value().data();
+        MessageBoxA(NULL, ss.str().data(), "Sim Coaches Visor Error", MB_OK | MB_ICONERROR);
+        return 1;
     }
     return 0;
 }

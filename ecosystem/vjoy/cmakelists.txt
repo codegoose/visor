@@ -1,7 +1,0 @@
-add_library(vjoy STATIC
-    "vjoy-interface.cxx"
-)
-
-target_link_libraries(vjoy
-
-)
