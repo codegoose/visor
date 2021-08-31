@@ -1,5 +1,6 @@
 add_executable(visor
     "visor.rc"
+    "application.cxx"
     "main.cxx"
     "ui.cxx"
 )

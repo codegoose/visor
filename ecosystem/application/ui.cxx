@@ -202,15 +202,15 @@ void sc::visor::emit_ui(const glm::ivec2 &framebuffer_size) {
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(fmt::format("{} Services", ICON_FA_CODE).data())) {
-                ImGui::Selectable(fmt::format("{} HID Firewall", ICON_FA_TOGGLE_OFF).data());
-                ImGui::Selectable(fmt::format("{} Virtual Joystick", ICON_FA_TOGGLE_ON).data());
+                ImGui::Selectable(fmt::format("{} Device Firewall", ICON_FA_TOGGLE_ON).data());
+                ImGui::Selectable(fmt::format("{} Virtual Gamepad", ICON_FA_TOGGLE_ON).data());
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(fmt::format("{} Devices", ICON_FA_CUBES).data())) {
-                ImGui::Selectable(fmt::format("{} Razer Ouroboros", ICON_FA_MICROCHIP).data());
-                ImGui::Selectable(fmt::format("{} BU**** Interface", ICON_FA_MICROCHIP).data());
-                ImGui::Selectable(fmt::format("{} Xbox Wireless Gamepad", ICON_FA_MICROCHIP).data());
-                ImGui::Separator();
+                if (joysticks.size()) {
+                    for (auto &joy_ptr : joysticks) ImGui::Selectable(fmt::format("{} {}", ICON_FA_MICROCHIP, SDL_JoystickName(joy_ptr)).data());
+                    ImGui::Separator();
+                }                
                 ImGui::Selectable(fmt::format("{} Clear System Calibrations", ICON_FA_ERASER).data());
                 ImGui::EndMenu();
             }
@@ -221,52 +221,54 @@ void sc::visor::emit_ui(const glm::ivec2 &framebuffer_size) {
             }
             ImGui::EndMenuBar();
         }
-        if (ImGui::BeginTabBar("")) {
-            if (ImGui::BeginTabItem(fmt::format("{} BU**** Interface", ICON_FA_MICROCHIP).data())) {
-                if (ImGui::BeginTabBar("##DeviceTabBar")) {
-                    if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_COG).data())) {
-                        if (ImGui::BeginChild("##DeviceMiscInformation", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                            if (ImGui::BeginMenuBar()) {
-                                ImGui::TextDisabled(fmt::format("{} HID\\VID_1532&PID_022A&MI_00&Col03\\9&1d13e3f6&0&0000", ICON_FA_USB).data());
-                                ImGui::EndMenuBar();
-                            }
-                            if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+        if (ImGui::BeginTabBar("##DeviceTabBar")) {
+            for (auto &joy_ptr : joysticks) {
+                if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, SDL_JoystickName(joy_ptr), reinterpret_cast<void *>(&joy_ptr)).data())) {
+                    if (ImGui::BeginTabBar("##DeviceSpecificsTabBar")) {
+                        if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_COG).data())) {
+                            if (ImGui::BeginChild("##DeviceMiscInformation", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                                 if (ImGui::BeginMenuBar()) {
-                                    ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
+                                    ImGui::TextDisabled(fmt::format("{} Vendor: {}, Product: {}, Version: {}", ICON_FA_USB, SDL_JoystickGetVendor(joy_ptr), SDL_JoystickGetProduct(joy_ptr), SDL_JoystickGetProductVersion(joy_ptr)).data());
                                     ImGui::EndMenuBar();
                                 }
-                                ImGui::Selectable(fmt::format("{} Axis #1", ICON_FA_SLIDERS_H).data());
-                                ImGui::Selectable(fmt::format("{} Axis #2", ICON_FA_SLIDERS_H).data());
-                                ImGui::Selectable(fmt::format("{} Axis #3", ICON_FA_SLIDERS_H).data());
-                                ImGui::Selectable(fmt::format("{} Axis #4", ICON_FA_SLIDERS_H).data());
-                                ImGui::Selectable(fmt::format("{} Button #1", ICON_FA_TOGGLE_ON).data());
-                                ImGui::Selectable(fmt::format("{} Button #2", ICON_FA_TOGGLE_ON).data());
-                                ImGui::Selectable(fmt::format("{} Button #3", ICON_FA_TOGGLE_ON).data());
-                            }
-                            ImGui::EndChild();
-                            ImGui::SameLine();
-                            if (ImGui::BeginChild("##DeviceHardwareItemCalibration", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                                if (ImGui::BeginMenuBar()) {
-                                    ImGui::Text(fmt::format("{} Calibration", ICON_FA_COGS).data());
-                                    ImGui::EndMenuBar();
+                                if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                                    if (ImGui::BeginMenuBar()) {
+                                        ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
+                                        ImGui::EndMenuBar();
+                                    }
+                                    ImGui::Selectable(fmt::format("{} Axis #1", ICON_FA_SLIDERS_H).data());
+                                    ImGui::Selectable(fmt::format("{} Axis #2", ICON_FA_SLIDERS_H).data());
+                                    ImGui::Selectable(fmt::format("{} Axis #3", ICON_FA_SLIDERS_H).data());
+                                    ImGui::Selectable(fmt::format("{} Axis #4", ICON_FA_SLIDERS_H).data());
+                                    ImGui::Selectable(fmt::format("{} Button #1", ICON_FA_TOGGLE_ON).data());
+                                    ImGui::Selectable(fmt::format("{} Button #2", ICON_FA_TOGGLE_ON).data());
+                                    ImGui::Selectable(fmt::format("{} Button #3", ICON_FA_TOGGLE_ON).data());
                                 }
+                                ImGui::EndChild();
+                                ImGui::SameLine();
+                                if (ImGui::BeginChild("##DeviceHardwareItemCalibration", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                                    if (ImGui::BeginMenuBar()) {
+                                        ImGui::Text(fmt::format("{} Calibration", ICON_FA_COGS).data());
+                                        ImGui::EndMenuBar();
+                                    }
+                                }
+                                ImGui::EndChild();
                             }
                             ImGui::EndChild();
+                            ImGui::EndTabItem();
                         }
-                        ImGui::EndChild();
-                        ImGui::EndTabItem();
+                        if (ImGui::BeginTabItem(fmt::format("{} Profile", ICON_FA_SLIDERS_H).data())) {
+                            emit_axis_profile_slice("Clutch");
+                            ImGui::SameLine();
+                            emit_axis_profile_slice("Brake");
+                            ImGui::SameLine();
+                            emit_axis_profile_slice("Throttle");
+                            ImGui::EndTabItem();
+                        }
+                        ImGui::EndTabBar();
                     }
-                    if (ImGui::BeginTabItem(fmt::format("{} Profile", ICON_FA_SLIDERS_H).data())) {
-                        emit_axis_profile_slice("Clutch");
-                        ImGui::SameLine();
-                        emit_axis_profile_slice("Brake");
-                        ImGui::SameLine();
-                        emit_axis_profile_slice("Throttle");
-                        ImGui::EndTabItem();
-                    }
-                    ImGui::EndTabBar();
+                    ImGui::EndTabItem();
                 }
-                ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
         }

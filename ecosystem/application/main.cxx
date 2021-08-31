@@ -6,6 +6,7 @@
 #undef min
 #undef max
 
+#include <algorithm>
 #include <optional>
 #include <vector>
 #include <string_view>
@@ -107,8 +108,10 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
         spdlog::debug("Disconnecting ViGEm client...");
         vigem_disconnect(vigem_client);
     });
-    const auto vigem_pad = vigem_target_x360_alloc();
+    const auto vigem_pad = vigem_target_ds4_alloc();
     if (vigem_pad == nullptr) return "Failed to allocate memory for ViGEm gamepad.";
+    vigem_target_set_vid(vigem_pad, 1001);
+    vigem_target_set_pid(vigem_pad, 2003);
     DEFER({
         spdlog::debug("Freeing ViGEm gamepad...");
         vigem_target_free(vigem_pad);
@@ -126,11 +129,63 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
     return std::nullopt;
 }
 
+static void process_joystick_events(const SDL_Event &sdl_event) {
+    if (sdl_event.type == SDL_JOYAXISMOTION) {
+        // spdlog::info("JOY axis: {}, {}, {}", event.jaxis.which, event.jaxis.axis, static_cast<int>(event.jaxis.value) + 32768);
+    } else if (sdl_event.type == SDL_JOYHATMOTION) {
+        spdlog::info("JOY hat: {}, {}, {}", sdl_event.jhat.which, sdl_event.jhat.hat, sdl_event.jhat.value);
+    } else if (sdl_event.type == SDL_JOYBUTTONDOWN) {
+        spdlog::info("JOY button: {}, {}, {}", sdl_event.jbutton.which, sdl_event.jbutton.button, sdl_event.jbutton.state);
+    } else if (sdl_event.type == SDL_JOYDEVICEADDED) {
+        const auto name = SDL_JoystickNameForIndex(sdl_event.jdevice.which);
+        spdlog::info("JOY added: #{}", sdl_event.jdevice.which);
+        const auto joystick = SDL_JoystickOpen(sdl_event.jdevice.which);
+        if (joystick == nullptr) return;
+        if (std::find(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), joystick) == sc::visor::joysticks.end()) sc::visor::joysticks.push_back(joystick);
+        const auto serial = SDL_JoystickGetSerial(joystick);
+        const auto guid = SDL_JoystickGetGUID(joystick);
+        const auto device_guid = SDL_JoystickGetGUID(joystick);
+        spdlog::info("Opened joystick #{}: {} -- {} buttons, {} axes // vendor: {}, product: {}, version: {}, instance: {} -- {} // -> {} @ {}",
+            sdl_event.jdevice.which,
+            SDL_JoystickName(joystick),
+            SDL_JoystickNumButtons(joystick),
+            SDL_JoystickNumAxes(joystick),
+            SDL_JoystickGetVendor(joystick),
+            SDL_JoystickGetProduct(joystick),
+            SDL_JoystickGetProductVersion(joystick),
+            SDL_JoystickInstanceID(joystick),
+            serial ? serial : "????",
+            SDL_JoystickInstanceID(joystick),
+            reinterpret_cast<void *>(joystick)
+        );
+    } else if (sdl_event.type == SDL_JOYDEVICEREMOVED) {
+        spdlog::info("JOY removed: #{}", sdl_event.jdevice.which);
+    }
+}
+
+static bool process_events(SDL_Window *sdl_window) {
+    bool should_quit = false;
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        process_joystick_events(event);
+        if (event.type == SDL_QUIT) {
+            spdlog::critical("Got quit event.");
+            should_quit = true;
+        }
+    }
+    if (should_quit) {
+        SDL_HideWindow(sdl_window);
+        return false;
+    }
+    return true;
+}
+
 static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgui_ctx, PVIGEM_CLIENT vigem_client, PVIGEM_TARGET vigem_pad) {
     ImDrawCompare im_draw_cache;
     ImFreetypeEnablement freetype;
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     SDL_JoystickEventState(SDL_ENABLE);
+    /*
     XUSB_REPORT report;
     report.bLeftTrigger = 0;
     report.bRightTrigger = 0;
@@ -139,64 +194,26 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
     report.sThumbRX = 0;
     report.sThumbRY = 0;
     report.wButtons = 0;
+    */
     for (;;) {
+        for (int i = 0; i < sc::visor::joysticks.size(); i++) {
+            if (SDL_JoystickGetAttached(sc::visor::joysticks[i]) == SDL_TRUE) continue;
+            SDL_JoystickClose(sc::visor::joysticks[i]);
+            spdlog::debug("Removed joystick: {}", reinterpret_cast<void *>(sc::visor::joysticks[i]));
+            sc::visor::joysticks.erase(sc::visor::joysticks.begin() + i);
+            i--;
+        }
+        /*
         report.bLeftTrigger = rand() % 255;
         report.bRightTrigger = rand() % 255;
-        // report.sThumbLX = -10000 + (rand() % 20000);
-        // report.sThumbLY = -10000 + (rand() % 20000);
-        // report.sThumbRX = -10000 + (rand() % 20000);
-        // report.sThumbRY = -10000 + (rand() % 20000);
+        report.sThumbLX = -10000 + (rand() % 20000);
+        report.sThumbLY = -10000 + (rand() % 20000);
+        report.sThumbRX = -10000 + (rand() % 20000);
+        report.sThumbRY = -10000 + (rand() % 20000);
         if (!VIGEM_SUCCESS(vigem_target_x360_update(vigem_client, vigem_pad, report))) return "Failed to update ViGEm gamepad.";
         fmt::print("{}, {}\n", report.bLeftTrigger, report.bRightTrigger);
-        {
-            bool should_quit = false;
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) {
-                    spdlog::critical("Got quit event.");
-                    should_quit = true;
-                } /* else if (event.type == SDL_JOYAXISMOTION) {
-                    spdlog::info("JOY axis: {}, {}, {}", event.jaxis.which, event.jaxis.axis, static_cast<int>(event.jaxis.value) + 32768);
-                } else if (event.type == SDL_JOYHATMOTION) {
-                    spdlog::info("JOY hat: {}, {}, {}", event.jhat.which, event.jhat.hat, event.jhat.value);
-                } else if (event.type == SDL_JOYBUTTONDOWN) {
-                    spdlog::info("JOY button: {}, {}, {}", event.jbutton.which, event.jbutton.button, event.jbutton.state);
-                } else if (event.type == SDL_JOYDEVICEADDED) {
-                    spdlog::info("JOY added: #{}", event.jdevice.which);
-                    const auto joystick = SDL_JoystickOpen(event.jdevice.which);
-                    if (joystick == nullptr) continue;
-                    const auto serial = SDL_JoystickGetSerial(joystick);
-                    const auto guid = SDL_JoystickGetGUID(joystick);
-                    const auto device_guid = SDL_JoystickGetGUID(joystick);
-                    spdlog::info("Opened joystick #{}: {} -- {} buttons, {} axes // vendor: {}, product: {}, version: {}, instance: {} -- {} // -> {}",
-                        event.jdevice.which,
-                        SDL_JoystickName(joystick),
-                        SDL_JoystickNumButtons(joystick),
-                        SDL_JoystickNumAxes(joystick),
-                        SDL_JoystickGetVendor(joystick),
-                        SDL_JoystickGetProduct(joystick),
-                        SDL_JoystickGetProductVersion(joystick),
-                        SDL_JoystickInstanceID(joystick),
-                        serial ? serial : "????",
-                        SDL_JoystickInstanceID(joystick)
-                    );
-                    for (int i = 0; i < sizeof(guid.data); i++) {
-                        fmt::print("{} ", static_cast<int>(guid.data[i]));
-                    }
-                    fmt::print("\n");
-                    for (int i = 0; i < sizeof(device_guid.data); i++) {
-                        fmt::print("{} ", static_cast<int>(device_guid.data[i]));
-                    }
-                    fmt::print("\n");
-                } else if (event.type == SDL_JOYDEVICEREMOVED) {
-                    spdlog::info("JOY removed: #{}", event.jdevice.which);
-                } */
-            }
-            if (should_quit) {
-                SDL_HideWindow(sdl_window);
-                break;
-            }
-        }
+        */
+        if (!process_events(sdl_window)) break;
         const auto hz = [&]() -> std::optional<int> {
             const auto display_i = SDL_GetWindowDisplayIndex(sdl_window);
             if (display_i < 0) return 60;
