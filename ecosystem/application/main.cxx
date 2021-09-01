@@ -265,7 +265,10 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
     return std::nullopt;
 }
 
+#include "../sentry/sentry.h"
 int main() {
+    sc::sentry::initialize("https://f4a284ccd2194db2982e121f4c3f8e1b@o881067.ingest.sentry.io/5942037");
+    DEFER(sc::sentry::shutdown());
     if (const auto err = bootstrap(run); err.has_value()) {
         spdlog::error("An error has occurred: {}", *err);
         std::stringstream ss;
