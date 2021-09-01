@@ -134,9 +134,9 @@ static void process_joystick_events(const SDL_Event &sdl_event) {
     if (sdl_event.type == SDL_JOYAXISMOTION) {
         // spdlog::info("JOY axis: {}, {}, {}", event.jaxis.which, event.jaxis.axis, static_cast<int>(event.jaxis.value) + 32768);
     } else if (sdl_event.type == SDL_JOYHATMOTION) {
-        spdlog::info("JOY hat: {}, {}, {}", sdl_event.jhat.which, sdl_event.jhat.hat, sdl_event.jhat.value);
+        spdlog::debug("JOY hat: {}, {}, {}", sdl_event.jhat.which, sdl_event.jhat.hat, sdl_event.jhat.value);
     } else if (sdl_event.type == SDL_JOYBUTTONDOWN) {
-        spdlog::info("JOY button: {}, {}, {}", sdl_event.jbutton.which, sdl_event.jbutton.button, sdl_event.jbutton.state);
+        spdlog::debug("JOY button: {}, {}, {}", sdl_event.jbutton.which, sdl_event.jbutton.button, sdl_event.jbutton.state);
     } else if (sdl_event.type == SDL_JOYDEVICEADDED) {
         const auto name = SDL_JoystickNameForIndex(sdl_event.jdevice.which);
         spdlog::info("JOY added: #{}", sdl_event.jdevice.which);
@@ -160,7 +160,7 @@ static void process_joystick_events(const SDL_Event &sdl_event) {
             reinterpret_cast<void *>(joystick)
         );
     } else if (sdl_event.type == SDL_JOYDEVICEREMOVED) {
-        spdlog::info("JOY removed: #{}", sdl_event.jdevice.which);
+        spdlog::debug("JOY removed: #{}", sdl_event.jdevice.which);
     }
 }
 
@@ -170,7 +170,7 @@ static bool process_events(SDL_Window *sdl_window) {
     while (SDL_PollEvent(&event)) {
         process_joystick_events(event);
         if (event.type == SDL_QUIT) {
-            spdlog::critical("Got quit event.");
+            spdlog::debug("Got quit event.");
             should_quit = true;
         }
     }
@@ -252,7 +252,7 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
             continue;
         }
         if (framebuffer_size_changed) {
-            spdlog::info("Framebuffer: {} -> {}, {} -> {}", recent_framebuffer_size.x, current_framebuffer_size.x, recent_framebuffer_size.y, current_framebuffer_size.y);
+            spdlog::debug("Framebuffer resized: {} -> {}, {} -> {}", recent_framebuffer_size.x, current_framebuffer_size.x, recent_framebuffer_size.y, current_framebuffer_size.y);
             glViewport(0, 0, current_framebuffer_size.x, current_framebuffer_size.y);
             recent_framebuffer_size.x = current_framebuffer_size.x;
             recent_framebuffer_size.y = current_framebuffer_size.y;

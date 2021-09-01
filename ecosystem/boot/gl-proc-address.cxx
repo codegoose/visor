@@ -11,7 +11,7 @@ std::function<glbinding::ProcAddress(const char*)> sc::boot::gl::get_proc_addres
     const auto text = fmt::format("GL: {} @ {}", name, reinterpret_cast<void *>(addr));
     if (addr) spdlog::debug(text);
     else {
-        spdlog::error(text);
+        spdlog::warn(text);
         exit(1000);
     }
     return reinterpret_cast<glbinding::ProcAddress>(addr);

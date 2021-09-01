@@ -4,7 +4,7 @@
 
 bool sc::font::imgui::load(const int &size) {
     if (!ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\seguisb.ttf", size)) {
-        spdlog::critical("Unable to load primary font.");
+        spdlog::error("Unable to load primary font.");
         return false;
     }
     {
@@ -13,7 +13,7 @@ bool sc::font::imgui::load(const int &size) {
         icons_config.MergeMode = true;
         icons_config.PixelSnapH = true;
         if (!ImGui::GetIO().Fonts->AddFontFromFileTTF( FONT_ICON_FILE_NAME_FAS, size - 4, &icons_config, icons_ranges)) {
-            spdlog::critical("Unable to load secondary font.");
+            spdlog::error("Unable to load secondary font.");
             return false;
         }
     }
@@ -23,10 +23,10 @@ bool sc::font::imgui::load(const int &size) {
         icons_config.MergeMode = true;
         icons_config.PixelSnapH = true;
         if (!ImGui::GetIO().Fonts->AddFontFromFileTTF( FONT_ICON_FILE_NAME_FAB, size - 4, &icons_config, icons_ranges)) {
-            spdlog::critical("Unable to load tertiary font.");
+            spdlog::error("Unable to load tertiary font.");
             return false;
         }
     }
-    spdlog::info("Fonts loaded.");
+    spdlog::debug("All fonts have been loaded.");
     return true;
 }
