@@ -256,7 +256,7 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
 #include "../sentry/sentry.h"
 
 int main() {
-    sc::sentry::initialize("https://f4a284ccd2194db2982e121f4c3f8e1b@o881067.ingest.sentry.io/5942037");
+    sc::sentry::initialize("https://f4a284ccd2194db2982e121f4c3f8e1b@o881067.ingest.sentry.io/5942037", "visor@internal-testing");
     DEFER(sc::sentry::shutdown());
     spdlog::set_default_logger(spdlog::stdout_color_mt("visor"));
     spdlog::set_level(spdlog::level::debug);
