@@ -31,6 +31,7 @@
 #include "../hidhide/hidhide.h"
 #include "../boot/gl-proc-address.h"
 #include "../font/imgui.h"
+#include "../systray/systray.h"
 
 #include "../vigem/Client.h"
 
@@ -181,6 +182,11 @@ static bool process_events(SDL_Window *sdl_window) {
 }
 
 static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgui_ctx, PVIGEM_CLIENT vigem_client, PVIGEM_TARGET vigem_pad) {
+    sc::systray::enable([sdl_window]() {
+        SDL_ShowWindow(sdl_window);
+        SDL_RestoreWindow(sdl_window);
+    });
+    DEFER(sc::systray::disable());
     ImDrawCompare im_draw_cache;
     ImFreetypeEnablement freetype;
     glm::ivec2 recent_framebuffer_size { 0, 0 };
