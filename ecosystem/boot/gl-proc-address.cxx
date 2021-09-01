@@ -12,6 +12,7 @@ std::function<glbinding::ProcAddress(const char*)> sc::boot::gl::get_proc_addres
     if (addr) spdlog::debug(text);
     else {
         spdlog::warn(text);
+        spdlog::default_logger()->flush();
         exit(1000);
     }
     return reinterpret_cast<glbinding::ProcAddress>(addr);
