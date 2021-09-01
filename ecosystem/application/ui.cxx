@@ -160,42 +160,39 @@ void emit_axis_profile_slice(std::string_view name) {
             }
             ImGui::SameLine();
             ImGui::Text("Curve Type");
-            static std::vector<glm::dvec2> model = {
-              { 0.0, 0.0 },
-              { 0.2, 0.2 },
-              { 0.4, 0.4 },
-              { 0.6, 0.6 },
-              { 0.8, 0.8 },
-              { 1.0, 1.0 }
+            static std::vector<glm::ivec2> model_percents = {
+              { 0, 0 },
+              { 20, 20 },
+              { 40, 40 },
+              { 60, 60 },
+              { 80, 80 },
+              { 100, 100 }
             };
-            const double model_element_min = 0, model_element_max = 1;
-            cubic_bezier_plot(model, { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x });
-            std::vector<glm::ivec2> model_percents;
-            for (auto &e : model) {
-                model_percents.push_back({
-                    static_cast<int>(e.x * 100.0),
-                    static_cast<int>(e.y * 100.0)
+            {
+                std::vector<glm::dvec2> model;
+                for (auto &percent : model_percents) model.push_back({
+                    static_cast<double>(percent.x) / 100.0,
+                    static_cast<double>(percent.y) / 100.0
                 });
+                cubic_bezier_plot(model, { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x });
             }
             ImGui::PushItemWidth(80);
             for (int i = 0; i < model_percents.size(); i++) {
                 if (i == 0 || i == model_percents.size() - 1) continue;
                 ImGui::TextDisabled(fmt::format("#{}", i + 1).data());
                 ImGui::SameLine();
-                if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data())) model_percents[i].x--;
+                if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data()) && model_percents[i].x > 0) model_percents[i].x--;
                 ImGui::SameLine();
-                if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data())) model_percents[i].x++;
+                if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data()) && model_percents[i].x < 100) model_percents[i].x++;
                 ImGui::SameLine();
-                if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &model_percents[i].x, i > 0 ? model_percents[i - 1].x : 0, i == model_percents.size() - 1 ? 100 : model_percents[i + 1].x));
+                if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &model_percents[i].x, 0, 100));
                 ImGui::SameLine();
-                ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data());
+                if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && model_percents[i].y > 0) model_percents[i].y--;
                 ImGui::SameLine();
-                ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data());
+                if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && model_percents[i].y < 100) model_percents[i].y++;
                 ImGui::SameLine();
                 ImGui::SameLine();
                 if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &model_percents[i].y, 0, 100));
-                model[i].x = static_cast<double>(glm::clamp(model_percents[i].x, i > 0 ? model_percents[i - 1].x : 0, i == model_percents.size() - 1 ? 100 : model_percents[i + 1].x)) / 100.0;
-                model[i].y = static_cast<double>(glm::clamp(model_percents[i].y, 0, 100)) / 100.0;
             }
             ImGui::PopItemWidth();
         }
@@ -229,9 +226,15 @@ void sc::visor::emit_ui(const glm::ivec2 &framebuffer_size) {
             }
             if (ImGui::BeginMenu(fmt::format("{} Devices", ICON_FA_CUBES).data())) {
                 if (joysticks.size()) {
-                    for (auto &joy_ptr : joysticks) ImGui::Selectable(fmt::format("{} {}", ICON_FA_MICROCHIP, SDL_JoystickName(joy_ptr)).data());
+                    for (const auto &joy_iid : joysticks) {
+                        const auto joy_ptr = SDL_JoystickFromInstanceID(joy_iid);
+                        if (joy_ptr == nullptr) continue;
+                        ImGui::Selectable(fmt::format("{} {}", ICON_FA_MICROCHIP, SDL_JoystickName(joy_ptr)).data());
+                        ImGui::SameLine();
+                        ImGui::TextDisabled(fmt::format("(IID {} @ {})", joy_iid, reinterpret_cast<void *>(joy_ptr)).data());
+                    }
                     ImGui::Separator();
-                }                
+                }
                 ImGui::Selectable(fmt::format("{} Clear System Calibrations", ICON_FA_ERASER).data());
                 ImGui::EndMenu();
             }
@@ -243,13 +246,15 @@ void sc::visor::emit_ui(const glm::ivec2 &framebuffer_size) {
             ImGui::EndMenuBar();
         }
         if (ImGui::BeginTabBar("##DeviceTabBar")) {
-            for (auto &joy_ptr : joysticks) {
-                if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, SDL_JoystickName(joy_ptr), reinterpret_cast<void *>(&joy_ptr)).data())) {
+            for (const auto &joy_iid : joysticks) {
+                const auto joy_ptr = SDL_JoystickFromInstanceID(joy_iid);
+                if (joy_ptr == nullptr) continue;
+                if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, SDL_JoystickName(joy_ptr), joy_iid).data())) {
                     if (ImGui::BeginTabBar("##DeviceSpecificsTabBar")) {
                         if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_COG).data())) {
                             if (ImGui::BeginChild("##DeviceMiscInformation", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                                 if (ImGui::BeginMenuBar()) {
-                                    ImGui::TextDisabled(fmt::format("{} Vendor: {}, Product: {}, Version: {}", ICON_FA_USB, SDL_JoystickGetVendor(joy_ptr), SDL_JoystickGetProduct(joy_ptr), SDL_JoystickGetProductVersion(joy_ptr)).data());
+                                    ImGui::TextDisabled(fmt::format("{} Vendor: {}, Product: {}", ICON_FA_USB, SDL_JoystickGetVendor(joy_ptr), SDL_JoystickGetProduct(joy_ptr)).data());
                                     ImGui::EndMenuBar();
                                 }
                                 if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
@@ -271,6 +276,20 @@ void sc::visor::emit_ui(const glm::ivec2 &framebuffer_size) {
                                         ImGui::Text(fmt::format("{} Calibration", ICON_FA_COGS).data());
                                         ImGui::EndMenuBar();
                                     }
+                                    if (ImGui::BeginChild("##{}DeadzoneWindow", { 0, 100 }, true, ImGuiWindowFlags_MenuBar)) {
+                                        if (ImGui::BeginMenuBar()) {
+                                            ImGui::Text(fmt::format("{} Deadzone", ICON_FA_ANCHOR).data());
+                                            ImGui::EndMenuBar();
+                                        }
+                                    }
+                                    ImGui::EndChild();
+                                    if (ImGui::BeginChild("##{}InputRangeWindow", { 0, 100 }, true, ImGuiWindowFlags_MenuBar)) {
+                                        if (ImGui::BeginMenuBar()) {
+                                            ImGui::Text(fmt::format("{} Range", ICON_FA_RULER).data());
+                                            ImGui::EndMenuBar();
+                                        }
+                                    }
+                                    ImGui::EndChild();
                                 }
                                 ImGui::EndChild();
                             }
@@ -308,13 +327,6 @@ void sc::visor::emit_ui(const glm::ivec2 &framebuffer_size) {
                                 ImGui::EndChild();
                                 ImGui::SameLine();
                                 emit_axis_profile_slice("Clutch");
-                                /*
-                                ImGui::SameLine();
-                                emit_axis_profile_slice("Brake");
-                                ImGui::SameLine();
-                                emit_axis_profile_slice("Throttle");
-                                ImGui::EndTabItem();
-                                */
                             }
                             ImGui::EndChild();
                             ImGui::EndTabItem();

@@ -14,7 +14,7 @@
 #include <functional>
 #include <glm/vec2.hpp>
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/bin_to_hex.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <SDL2/SDL.h>
 #include <glbinding/glbinding.h>
 #include <glbinding/gl33core/gl.h>
@@ -46,12 +46,12 @@ static std::optional<std::string> prepare_styling() {
     style.ChildRounding = 3.f;
     style.ScrollbarRounding = 3.f;
     style.WindowRounding = 3.f;
+    style.GrabRounding = 3.f;
     return std::nullopt;
 }
 
 std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SDL_Window *, ImGuiContext *, PVIGEM_CLIENT, PVIGEM_TARGET)> success_cb) {
     SDL_SetMainReady();
-    spdlog::set_level(spdlog::level::debug);
     const glm::ivec2 initial_framebuffer_size { 932, 768 };
     DEFER({
         spdlog::debug("Terminating SDL subsystems...");
@@ -139,28 +139,18 @@ static void process_joystick_events(const SDL_Event &sdl_event) {
         spdlog::debug("JOY button: {}, {}, {}", sdl_event.jbutton.which, sdl_event.jbutton.button, sdl_event.jbutton.state);
     } else if (sdl_event.type == SDL_JOYDEVICEADDED) {
         const auto name = SDL_JoystickNameForIndex(sdl_event.jdevice.which);
-        spdlog::info("JOY added: #{}", sdl_event.jdevice.which);
-        const auto joystick = SDL_JoystickOpen(sdl_event.jdevice.which);
-        if (joystick == nullptr) return;
-        if (std::find(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), joystick) == sc::visor::joysticks.end()) sc::visor::joysticks.push_back(joystick);
-        const auto serial = SDL_JoystickGetSerial(joystick);
-        const auto guid = SDL_JoystickGetGUID(joystick);
-        const auto device_guid = SDL_JoystickGetGUID(joystick);
-        spdlog::info("Opened joystick #{}: {} -- {} buttons, {} axes // vendor: {}, product: {}, version: {}, instance: {} -- {} // -> {} @ {}",
-            sdl_event.jdevice.which,
-            SDL_JoystickName(joystick),
-            SDL_JoystickNumButtons(joystick),
-            SDL_JoystickNumAxes(joystick),
-            SDL_JoystickGetVendor(joystick),
-            SDL_JoystickGetProduct(joystick),
-            SDL_JoystickGetProductVersion(joystick),
-            SDL_JoystickInstanceID(joystick),
-            serial ? serial : "????",
-            SDL_JoystickInstanceID(joystick),
-            reinterpret_cast<void *>(joystick)
-        );
+        spdlog::debug("JOY added: #{}, \"{}\"", sdl_event.jdevice.which, name);
+        const auto num_joysticks = SDL_NumJoysticks();
+        for (int i = 0; i < num_joysticks; i++) {
+            if (const auto joystick = SDL_JoystickOpen(i); joystick) {
+                const auto instance_id = SDL_JoystickInstanceID(joystick);
+                if (std::find(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), instance_id) == sc::visor::joysticks.end()) sc::visor::joysticks.push_back(instance_id);
+            }
+        }
     } else if (sdl_event.type == SDL_JOYDEVICEREMOVED) {
         spdlog::debug("JOY removed: #{}", sdl_event.jdevice.which);
+        const auto i = std::find(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), sdl_event.jdevice.which);
+        if (i != sc::visor::joysticks.end()) sc::visor::joysticks.erase(i);
     }
 }
 
@@ -202,13 +192,6 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
     report.wButtons = 0;
     */
     for (;;) {
-        for (int i = 0; i < sc::visor::joysticks.size(); i++) {
-            if (SDL_JoystickGetAttached(sc::visor::joysticks[i]) == SDL_TRUE) continue;
-            SDL_JoystickClose(sc::visor::joysticks[i]);
-            spdlog::debug("Removed joystick: {}", reinterpret_cast<void *>(sc::visor::joysticks[i]));
-            sc::visor::joysticks.erase(sc::visor::joysticks.begin() + i);
-            i--;
-        }
         /*
         report.bLeftTrigger = rand() % 255;
         report.bRightTrigger = rand() % 255;
@@ -246,8 +229,8 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
         const auto draw_data = ImGui::GetDrawData();
         const bool draw_data_changed = !im_draw_cache.Check(draw_data);
         const bool framebuffer_size_changed = (current_framebuffer_size.x != recent_framebuffer_size.x || current_framebuffer_size.y != recent_framebuffer_size.y);
-        const bool needRedraw = framebuffer_size_changed || draw_data_changed;
-        if (!needRedraw) {
+        const bool need_redraw = framebuffer_size_changed || draw_data_changed;
+        if (!need_redraw) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000 / (hz ? *hz : 60)));
             continue;
         }
@@ -257,24 +240,26 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
             recent_framebuffer_size.x = current_framebuffer_size.x;
             recent_framebuffer_size.y = current_framebuffer_size.y;
         }
-        spdlog::info("Rendering.");
         glClearColor(.4, .6, .8, 1);
         glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(draw_data);
-        SDL_GL_SwapWindow(sdl_window);
         if (static bool shown_window = false; !shown_window) {
             spdlog::debug("First render complete. Making window visible.");
             SDL_ShowWindow(sdl_window);
             shown_window = true;
         }
+        ImGui_ImplOpenGL3_RenderDrawData(draw_data);
+        SDL_GL_SwapWindow(sdl_window);
     }
     return std::nullopt;
 }
 
 #include "../sentry/sentry.h"
+
 int main() {
     sc::sentry::initialize("https://f4a284ccd2194db2982e121f4c3f8e1b@o881067.ingest.sentry.io/5942037");
     DEFER(sc::sentry::shutdown());
+    spdlog::set_default_logger(spdlog::stdout_color_mt("visor"));
+    spdlog::set_level(spdlog::level::debug);
     if (const auto err = bootstrap(run); err.has_value()) {
         spdlog::error("An error has occurred: {}", *err);
         std::stringstream ss;

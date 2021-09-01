@@ -7,7 +7,7 @@
 
 namespace sc::visor {
 
-    extern std::vector<SDL_Joystick *> joysticks;
+    extern std::vector<SDL_JoystickID> joysticks;
 
     void emit_ui(const glm::ivec2 &framebuffer_size);
 }
