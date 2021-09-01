@@ -16,14 +16,14 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-			VALUE "CompanyName", "SimCoaches"
-			VALUE "FileDescription", "Visor"
+            VALUE "CompanyName", "SimCoaches"
+            VALUE "FileDescription", "Visor"
             VALUE "FileVersion", "0.98"
             VALUE "InternalName", "KERV"
             VALUE "LegalCopyright", "SimCoaches (2021)"
             VALUE "OriginalFilename", "visor.exe"
-			VALUE "ProductName", "Visor"
-			VALUE "ProductVersion", "0.98"
+            VALUE "ProductName", "Visor"
+            VALUE "ProductVersion", "0.98"
         END
     END
     BLOCK "VarFileInfo"
