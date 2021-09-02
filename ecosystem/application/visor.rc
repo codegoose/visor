@@ -1,6 +1,9 @@
 #include <windows.h>
 
+#include "version.h"
+
 LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
 GLFW_ICON  ICON ".\\visor.ico"
 TRAY_ICON  ICON ".\\visor.ico"
 
@@ -16,10 +19,10 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName", "SimCoaches"
-            VALUE "LegalCopyright", "SimCoaches (2021)"
-            VALUE "ProductName", "Visor"
-            VALUE "ProductVersion", "0.98"
+            VALUE "CompanyName", "Sim Coaches"
+            VALUE "LegalCopyright", "Sim Coaches"
+            VALUE "ProductName", SC_APP_NAME
+            VALUE "ProductVersion", SC_APP_VER
         END
     END
     BLOCK "VarFileInfo"

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "version.h"
+
 #include <vector>
 
 #include <glm/vec2.hpp>

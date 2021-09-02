@@ -64,7 +64,7 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    const auto sdl_window = SDL_CreateWindow("Visor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, initial_framebuffer_size.x, initial_framebuffer_size.y, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+    const auto sdl_window = SDL_CreateWindow(SC_APP_NAME, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, initial_framebuffer_size.x, initial_framebuffer_size.y, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
     if (!sdl_window) return "Failed to create window.";
     DEFER({
         spdlog::debug("Destroying main window...");
@@ -255,9 +255,13 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
 
 #include "../sentry/sentry.h"
 
+#include <pystring.h>
+
 int main() {
-    sc::sentry::initialize("https://f4a284ccd2194db2982e121f4c3f8e1b@o881067.ingest.sentry.io/5942037", "visor@internal-testing");
+    #ifdef NDEBUG
+    sc::sentry::initialize("https://f4a284ccd2194db2982e121f4c3f8e1b@o881067.ingest.sentry.io/5942037", fmt::format("{}@{}", pystring::lower(SC_APP_NAME), SC_APP_VER).data());
     DEFER(sc::sentry::shutdown());
+    #endif
     spdlog::set_default_logger(spdlog::stdout_color_mt("visor"));
     spdlog::set_level(spdlog::level::debug);
     if (const auto err = bootstrap(run); err.has_value()) {
