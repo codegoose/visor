@@ -111,8 +111,6 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
     });
     const auto vigem_pad = vigem_target_ds4_alloc();
     if (vigem_pad == nullptr) return "Failed to allocate memory for ViGEm gamepad.";
-    vigem_target_set_vid(vigem_pad, 1001);
-    vigem_target_set_pid(vigem_pad, 2003);
     DEFER({
         spdlog::debug("Freeing ViGEm gamepad...");
         vigem_target_free(vigem_pad);
@@ -130,26 +128,82 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
     return std::nullopt;
 }
 
+static bool hide_product(const std::string_view &name) {
+    if (!sc::hidhide::is_enabled()) {
+        if (!sc::hidhide::set_enabled(true)) {
+            spdlog::error("Unable to activate HIDHIDE.");
+            return false;
+        } else spdlog::debug("Activated HIDHIDE as it was disabled.");
+    } // else spdlog::debug("HIDHIDE is already enabled.");
+    const auto present_devices = sc::hidhide::list_devices();
+    if (!present_devices) {
+        spdlog::error("Unable to enumerate hidden devices.");
+        return false;
+    }
+    auto blacklist = sc::hidhide::get_blacklist();
+    if (!blacklist) {
+        spdlog::error("Unable to get HIDHIDE blacklist");
+        return false;
+    }
+    bool blacklist_changed = false;
+    for (auto device : *present_devices) {
+        if (name != device.product_name) continue;
+        if (std::find(blacklist->begin(), blacklist->end(), device.instance_path) != blacklist->end()) continue;
+        spdlog::debug("Hiding: {} @ {}", device.product_name, device.instance_path);
+        blacklist->push_back(device.instance_path);
+        blacklist_changed = true;
+    }
+    if (!blacklist_changed) {
+        spdlog::debug("No new devices to hide.");
+        return true;
+    }
+    if (!sc::hidhide::set_blacklist(*blacklist)) {
+        spdlog::error("Unable to update hidden devices listing.");
+        return false;
+    }
+    spdlog::debug("HIDHIDE list updated.");
+    return true;
+}
+
 static void process_joystick_events(const SDL_Event &sdl_event) {
     if (sdl_event.type == SDL_JOYAXISMOTION) {
         // spdlog::info("JOY axis: {}, {}, {}", event.jaxis.which, event.jaxis.axis, static_cast<int>(event.jaxis.value) + 32768);
     } else if (sdl_event.type == SDL_JOYHATMOTION) {
-        spdlog::debug("JOY hat: {}, {}, {}", sdl_event.jhat.which, sdl_event.jhat.hat, sdl_event.jhat.value);
+        spdlog::debug("Joystick hat: {}, {}, {}", sdl_event.jhat.which, sdl_event.jhat.hat, sdl_event.jhat.value);
     } else if (sdl_event.type == SDL_JOYBUTTONDOWN) {
-        spdlog::debug("JOY button: {}, {}, {}", sdl_event.jbutton.which, sdl_event.jbutton.button, sdl_event.jbutton.state);
+        spdlog::debug("Joystick button: {}, {}, {}", sdl_event.jbutton.which, sdl_event.jbutton.button, sdl_event.jbutton.state);
     } else if (sdl_event.type == SDL_JOYDEVICEADDED) {
-        const auto name = SDL_JoystickNameForIndex(sdl_event.jdevice.which);
-        spdlog::debug("JOY added: #{}, \"{}\"", sdl_event.jdevice.which, name);
         const auto num_joysticks = SDL_NumJoysticks();
         for (int i = 0; i < num_joysticks; i++) {
             if (const auto joystick = SDL_JoystickOpen(i); joystick) {
                 const auto instance_id = SDL_JoystickInstanceID(joystick);
-                if (std::find(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), instance_id) == sc::visor::joysticks.end()) sc::visor::joysticks.push_back(instance_id);
+                const auto name = SDL_JoystickName(joystick);
+                if (strcmp("Sim Coaches P1 Pro Pedals", name) != 0) continue;
+                hide_product(name);
+                if (std::find_if(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), [&](std::shared_ptr<sc::visor::joystick> &joy) {
+                    return joy->instance_id == instance_id;
+                }) == sc::visor::joysticks.end()) {
+                    auto new_joystick = std::make_shared<sc::visor::joystick>(instance_id);
+                    const auto num_axes = SDL_JoystickNumAxes(joystick);
+                    const auto num_buttons = 0; // SDL_JoystickNumButtons(joystick);
+                    const auto num_hats = 0; // SDL_JoystickNumHats(joystick);
+                    if (num_axes < 0 || num_buttons < 0 || num_hats < 0) {
+                        spdlog::error("Unable to enumerate joystick: {}, {} axes, {} buttons, {} hats", name, num_axes, num_buttons, num_hats);
+                        continue;
+                    }
+                    new_joystick->axes.resize(num_axes);
+                    new_joystick->buttons.resize(num_buttons);
+                    new_joystick->hats.resize(num_hats);
+                    sc::visor::joysticks.push_back(new_joystick);
+                    spdlog::debug("Joystick added: #{}, \"{}\", {} axes, {} buttons, {} hats", sdl_event.jdevice.which, name, num_axes, num_buttons, num_hats);
+                }
             }
         }
     } else if (sdl_event.type == SDL_JOYDEVICEREMOVED) {
-        spdlog::debug("JOY removed: #{}", sdl_event.jdevice.which);
-        const auto i = std::find(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), sdl_event.jdevice.which);
+        spdlog::debug("Joystick removed: #{}", sdl_event.jdevice.which);
+        const auto i = std::find_if(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), [&](std::shared_ptr<sc::visor::joystick> &joy) {
+            return joy->instance_id == sdl_event.jdevice.which;
+        });
         if (i != sc::visor::joysticks.end()) sc::visor::joysticks.erase(i);
     }
 }
@@ -220,7 +274,7 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
             SDL_GL_GetDrawableSize(sdl_window, &dw, &dh);
             return { dw, dh };
         }();
-        freetype.preNewFrame();
+        freetype.PreNewFrame();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
