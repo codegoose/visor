@@ -17,7 +17,7 @@ bool sc::sentry::initialize(const std::string_view &dsn, const std::string_view 
     sentry_options_set_dsn(options, dsn.data());
     sentry_options_set_release(options, release.data());
     const bool success = (sentry_init(options) == 0);
-    std::clog << "Sentry: " << (success ? "Initialized" : "Failed to initialize.") << std::endl;
+    std::clog << "Sentry: " << (success ? "Initialized" : "Failed to initialize.") << " (Release: " << release << ")" << std::endl;
     if (success) {
         sentry_value_set_by_key(user, "ip_address", sentry_value_new_string("{{auto}}"));
         sentry_set_user(user);
