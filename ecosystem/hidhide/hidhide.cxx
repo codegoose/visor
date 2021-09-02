@@ -379,7 +379,7 @@ namespace sc::hidhide {
     bool populate_vid_pid_to_product_name_map() {
         if (SUCCEEDED(DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&direct_input_8_context, NULL))) {
             if (SUCCEEDED(IDirectInput8_EnumDevices(direct_input_8_context, DI8DEVCLASS_ALL, di8_enum_device_callback, NULL, DIEDFL_ALLDEVICES))) {
-                logger()->debug("Enumerated DirectInput8 devices.");
+                // logger()->debug("Enumerated DirectInput8 devices.");
                 return true;
             } else logger()->warn("Failed to enumerate DirectInput8 devices.");
             direct_input_8_context->Release();
@@ -448,24 +448,24 @@ std::optional<std::vector<sc::hidhide::system_hid>> sc::hidhide::list_devices() 
     std::vector<sc::hidhide::system_hid> res;
     for (auto &device_instance_path : instances.value()) {
         auto instance_path_chars = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(device_instance_path);
-        logger()->debug("Instance path: {}", instance_path_chars);
+        // logger()->debug("Instance path: {}", instance_path_chars);
         auto vid_i = instance_path_chars.find("\\VID_");
         if (vid_i == std::string::npos) {
-            logger()->debug("Unable to find vendor ID within instance path: {}", instance_path_chars);
+            // logger()->debug("Unable to find vendor ID within instance path: {}", instance_path_chars);
             continue;
         }
         auto pid_i = instance_path_chars.find("&PID_");
         if (pid_i == std::string::npos) {
-            logger()->debug("Unable to find product ID within instance path: {}", instance_path_chars);
+            // logger()->debug("Unable to find product ID within instance path: {}", instance_path_chars);
             continue;
         }
         auto vid = instance_path_chars.substr(vid_i + 5, 4);
         auto pid = instance_path_chars.substr(pid_i + 5, 4);
         auto product_name_i = vid_pid_product_map.find({ vid, pid });
         if (product_name_i == vid_pid_product_map.end()) {
-            logger()->debug("Unable to map VID/PID to product name: {}/{}", vid, pid);
+            // logger()->debug("Unable to map VID/PID to product name: {}/{}", vid, pid);
             continue;
-        } else logger()->debug("Mapped VID/PID to product name: {}/{} -> [{}]", vid, pid, product_name_i->second);
+        } // else logger()->debug("Mapped VID/PID to product name: {}/{} -> [{}]", vid, pid, product_name_i->second);
         res.push_back({ instance_path_chars, product_name_i->second });
     }
     return res;
