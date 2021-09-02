@@ -1,3 +1,3 @@
 #include "application.h"
 
-std::vector<SDL_JoystickID> sc::visor::joysticks;
+std::vector<std::shared_ptr<sc::visor::joystick>> sc::visor::joysticks;

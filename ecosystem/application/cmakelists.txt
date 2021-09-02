@@ -1,6 +1,7 @@
 add_executable(visor
     "visor.rc"
     "application.cxx"
+    "joystick.cxx"
     "main.cxx"
     "ui.cxx"
 )
@@ -14,6 +15,7 @@ target_link_libraries(visor
     CONAN_PKG::imgui
     CONAN_PKG::freetype
     CONAN_PKG::pystring
+    CONAN_PKG::nlohmann_json
 
     boot
     imgui
