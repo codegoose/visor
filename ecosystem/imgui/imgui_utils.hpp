@@ -1,10 +1,16 @@
+#pragma once
+
+#include <imgui.h>
+
+#include "imgui_freetype.h"
+
 struct ImFreetypeEnablement {
 
     bool needs_rebuild = true;
     float alpha = 1;
     unsigned int build_flags = 0;
 
-    bool preNewFrame() {
+    bool PreNewFrame() {
         if (!needs_rebuild) return false;
         auto atlas = ImGui::GetIO().Fonts;
         for (int n = 0; n < atlas->ConfigData.Size; n++) ((ImFontConfig*)&atlas->ConfigData[n])->RasterizerMultiply = alpha;
@@ -52,5 +58,25 @@ struct ImDrawCompare {
             memcpy(prev_indices[i].data(), this_draw_list->IdxBuffer.Data, sizeof(ImDrawIdx) * this_draw_list->IdxBuffer.size());
         }
         return false;
+    }
+};
+
+struct ImPenUtility {
+
+    ImVec2 content_region_size, content_region_start;
+    ImVec2 window_position, window_padding;
+
+    void CalculateWindowBounds() {
+        window_position = ImGui::GetWindowPos();
+        window_padding = ImGui::GetStyle().WindowPadding;
+        content_region_size = ImGui::GetWindowContentRegionMax();
+        content_region_start = ImVec2(window_position.x + (window_padding.x / 2), window_position.y + (window_padding.y / 2));
+    }
+
+    ImVec2 GetCenteredPosition(const ImVec2 &size) {
+        return {
+            content_region_start.x + (content_region_size.x / 2) - (size.x / 2),
+            content_region_start.y + (content_region_size.y / 2) - (size.y / 2)
+        };
     }
 };
