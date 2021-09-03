@@ -321,6 +321,7 @@ int main() {
     #ifndef NDEBUG
     spdlog::critical("This application has been built in DEBUG mode!");
     #endif
+    spdlog::info("Program version: {}", SC_APP_VER);
     if (const auto err = bootstrap(run); err.has_value()) {
         spdlog::error("An error has occurred: {}", *err);
         std::stringstream ss;
