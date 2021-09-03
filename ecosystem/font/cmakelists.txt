@@ -9,4 +9,5 @@ target_link_libraries(font
     CONAN_PKG::freetype
 
     imgui
+    resource
 )
