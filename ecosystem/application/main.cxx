@@ -318,6 +318,9 @@ int main() {
     #endif
     spdlog::set_default_logger(spdlog::stdout_color_mt("visor"));
     spdlog::set_level(spdlog::level::debug);
+    #ifndef NDEBUG
+    spdlog::critical("This application has been built in DEBUG mode!");
+    #endif
     if (const auto err = bootstrap(run); err.has_value()) {
         spdlog::error("An error has occurred: {}", *err);
         std::stringstream ss;
