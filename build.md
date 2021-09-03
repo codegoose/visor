@@ -12,7 +12,7 @@ cmake ..
 cmake --build . --config Debug
 ```
 
-Not that's Debug mode. Possible options are:
+Note: that's ```Debug``` mode. Possible options are:
 
 ```
 None
@@ -20,6 +20,14 @@ Debug
 Release
 RelWithDebInfo
 MinSizeRel
+```
+
+Use ```RelWithDebInfo``` for release builds that implement Sentry.
+
+```
+conan install .. -s build_type=RelWithDebInfo --build=missing
+...
+cmake --build . --config RelWithDebInfo
 ```
 
 ## Update Intellisense Paths
