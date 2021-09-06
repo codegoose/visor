@@ -1,0 +1,1 @@
+.\sentry-cli.exe --auth-token e78834e1d58943b9a82165aa756d4e214d4c953b8e79424dbebeca47b51d5c00 upload-dif -o unicorn-solutions -p simcoaches-visor build/bin --include-sources --wait
