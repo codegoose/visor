@@ -15,7 +15,6 @@ target_link_libraries(visor
     CONAN_PKG::imgui
     CONAN_PKG::freetype
     CONAN_PKG::pystring
-    CONAN_PKG::nlohmann_json
 
     boot
     imgui
@@ -24,4 +23,5 @@ target_link_libraries(visor
     vigem
     systray
     sentry
+    storage
 )

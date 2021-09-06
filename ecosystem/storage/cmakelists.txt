@@ -1,0 +1,9 @@
+add_library(storage STATIC
+    "storage.cxx"
+)
+
+target_link_libraries(storage
+    CONAN_PKG::yaml-cpp
+    CONAN_PKG::tl-expected
+    CONAN_PKG::spdlog
+)

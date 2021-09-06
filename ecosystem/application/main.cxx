@@ -23,6 +23,7 @@
 
 #include "application.h"
 
+#include "../storage/storage.h"
 #include "../imgui/imgui_impl_sdl.h"
 #include "../imgui/imgui_impl_opengl3.h"
 #include "../imgui/imgui_freetype.h"
@@ -36,7 +37,7 @@
 
 #include "../vigem/Client.h"
 
-DS4_REPORT *gamepad = nullptr;
+XUSB_REPORT *gamepad = nullptr;
 
 using namespace gl;
 
@@ -125,7 +126,7 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
         spdlog::debug("Disconnecting ViGEm client...");
         vigem_disconnect(vigem_client);
     });
-    const auto vigem_pad = vigem_target_ds4_alloc();
+    const auto vigem_pad = vigem_target_x360_alloc();
     if (vigem_pad == nullptr) return "Failed to allocate memory for ViGEm gamepad.";
     DEFER({
         spdlog::debug("Freeing ViGEm gamepad...");
@@ -194,16 +195,17 @@ static void process_joystick_events(const SDL_Event &sdl_event) {
             i->get()->axes[sdl_event.jaxis.axis].fraction = glm::clamp((static_cast<float>(i->get()->axes[sdl_event.jaxis.axis].val) - static_cast<float>(i->get()->axes[sdl_event.jaxis.axis].min)) / (static_cast<float>(i->get()->axes[sdl_event.jaxis.axis].max) - static_cast<float>(i->get()->axes[sdl_event.jaxis.axis].min)), 0.f, 1.f);
             switch (sdl_event.jaxis.axis) {
                 case 0:
-                    gamepad->bTriggerL = glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(std::numeric_limits<BYTE>::max())), static_cast<BYTE>(0), std::numeric_limits<BYTE>::max());
-                    spdlog::info("bTriggerL {}", gamepad->bTriggerL);
+                    gamepad->bLeftTrigger = glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(std::numeric_limits<BYTE>::max())), std::numeric_limits<BYTE>::min(), std::numeric_limits<BYTE>::max());
+                    // gamepad->bTriggerL = glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(std::numeric_limits<BYTE>::max())), static_cast<BYTE>(0), std::numeric_limits<BYTE>::max());
+                    // spdlog::info("bTriggerL {}", gamepad->bTriggerL);
                     break;
                 case 1:
-                    gamepad->bTriggerR = glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(std::numeric_limits<BYTE>::max())), static_cast<BYTE>(0), std::numeric_limits<BYTE>::max());
-                    spdlog::info("bTriggerR {}", gamepad->bTriggerR);
+                    // gamepad->bTriggerR = glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(std::numeric_limits<BYTE>::max())), static_cast<BYTE>(0), std::numeric_limits<BYTE>::max());
+                    // spdlog::info("bTriggerR {}", gamepad->bTriggerR);
                     break;
                 case 2:
-                    gamepad->bThumbLY = 128 + glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(127)), static_cast<BYTE>(0), static_cast<BYTE>(127));
-                    spdlog::info("bThumbLY {}", gamepad->bThumbLY);
+                    // gamepad->bThumbLY = 128 + glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(127)), static_cast<BYTE>(0), static_cast<BYTE>(127));
+                    // spdlog::info("bThumbLY {}", gamepad->bThumbLY);
                     break;
             }
         } else spdlog::warn("BAD");
@@ -265,22 +267,43 @@ static bool process_events(SDL_Window *sdl_window) {
     return true;
 }
 
+#include "../storage/storage-object.h"
+
 static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgui_ctx, PVIGEM_CLIENT vigem_client, PVIGEM_TARGET vigem_pad) {
     sc::systray::enable([sdl_window]() {
         SDL_ShowWindow(sdl_window);
         SDL_RestoreWindow(sdl_window);
     });
     DEFER(sc::systray::disable());
+    if (const auto err = sc::storage::initialize(); err) return err;
+    DEFER(sc::storage::shutdown());
+    sc::storage::set_flag("accepted-eula", true);
+    sc::storage::set_flag("walkthrough-completed", true);
+    {
+        YAML::Emitter out;
+        out.SetIndent(2);
+        out << YAML::BeginMap;
+        out << YAML::Key << "username" << YAML::Value << "brandon@simcoaches.com";
+        out << YAML::Key << "password_hash" << YAML::Value << "123abc";
+        out << YAML::Key << "nanner" << YAML::Value;
+            out << YAML::BeginSeq;
+            out << "This is a test!";
+            out << "This is another test!";
+            out << YAML::EndSeq;
+        out << YAML::EndMap;
+        sc::storage::set_object("user-credentials", out);
+    }
+    sc::storage::sync();
     ImDrawCompare im_draw_cache;
     ImFreetypeEnablement freetype;
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     SDL_JoystickEventState(SDL_ENABLE);
-    DS4_REPORT report;
-    DS4_REPORT_INIT(&report);
-    gamepad = &report;
+    XUSB_REPORT gamepad_report;
+    XUSB_REPORT_INIT(&gamepad_report);
+    gamepad = &gamepad_report;
     for (;;) {
         if (!process_events(sdl_window)) break;
-        if (!VIGEM_SUCCESS(vigem_target_ds4_update(vigem_client, vigem_pad, report))) return "Failed to update ViGEm gamepad.";
+        if (!VIGEM_SUCCESS(vigem_target_x360_update(vigem_client, vigem_pad, gamepad_report))) return "Failed to update ViGEm gamepad.";
         const auto hz = [&]() -> std::optional<int> {
             const auto display_i = SDL_GetWindowDisplayIndex(sdl_window);
             if (display_i < 0) return 60;
