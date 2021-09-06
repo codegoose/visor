@@ -12,6 +12,7 @@
 #include <string_view>
 #include <sstream>
 #include <functional>
+#include <glm/common.hpp>
 #include <glm/vec2.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -35,6 +36,8 @@
 
 #include "../vigem/Client.h"
 
+DS4_REPORT *gamepad = nullptr;
+
 using namespace gl;
 
 static std::optional<std::string> prepare_styling() {
@@ -47,6 +50,19 @@ static std::optional<std::string> prepare_styling() {
     style.ScrollbarRounding = 3.f;
     style.WindowRounding = 3.f;
     style.GrabRounding = 3.f;
+    return std::nullopt;
+}
+
+static std::optional<std::filesystem::path> get_module_file_path() {
+    TCHAR path[MAX_PATH];
+    if (GetModuleFileNameA(NULL, path, sizeof(path)) == 0) return std::nullopt;
+    return path;
+}
+
+static std::optional<std::string> module_to_whitelist() {
+    const auto this_exe = get_module_file_path();
+    if (!this_exe) return "Unable to assess module file path.";
+    if (!sc::hidhide::set_whitelist({ *this_exe })) return "Unable to update HIDHIDE whitelist.";
     return std::nullopt;
 }
 
@@ -120,6 +136,7 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
         spdlog::debug("Unplugging ViGEm gamepad...");
         vigem_target_remove(vigem_client, vigem_pad);
     });
+    if (const auto error = module_to_whitelist(); error) return "Unable to add this module to HIDHIDE whitelist.";
     spdlog::info("Bootstrapping completed.");
     if (const auto cb_err = success_cb(sdl_window, imgui_ctx, vigem_client, vigem_pad); cb_err.has_value()) {
         spdlog::warn("Bootstrap success routine returned an error: {}", *cb_err);
@@ -167,7 +184,29 @@ static bool hide_product(const std::string_view &name) {
 
 static void process_joystick_events(const SDL_Event &sdl_event) {
     if (sdl_event.type == SDL_JOYAXISMOTION) {
-        // spdlog::info("JOY axis: {}, {}, {}", event.jaxis.which, event.jaxis.axis, static_cast<int>(event.jaxis.value) + 32768);
+        const auto vid = SDL_JoystickGetVendor(SDL_JoystickFromInstanceID(sdl_event.jaxis.which));
+        const auto pid = SDL_JoystickGetProduct(SDL_JoystickFromInstanceID(sdl_event.jaxis.which));
+        if (!(vid == 7634 && pid == 10037)) return;
+        if (auto i = std::find_if(sc::visor::joysticks.begin(), sc::visor::joysticks.end(), [&](std::shared_ptr<sc::visor::joystick> joy) {
+            return joy->instance_id == sdl_event.jaxis.which;
+        }); i != sc::visor::joysticks.end()) {
+            i->get()->axes[sdl_event.jaxis.axis].val = sdl_event.jaxis.value;
+            i->get()->axes[sdl_event.jaxis.axis].fraction = glm::clamp((static_cast<float>(i->get()->axes[sdl_event.jaxis.axis].val) - static_cast<float>(i->get()->axes[sdl_event.jaxis.axis].min)) / (static_cast<float>(i->get()->axes[sdl_event.jaxis.axis].max) - static_cast<float>(i->get()->axes[sdl_event.jaxis.axis].min)), 0.f, 1.f);
+            switch (sdl_event.jaxis.axis) {
+                case 0:
+                    gamepad->bTriggerL = glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(std::numeric_limits<BYTE>::max())), static_cast<BYTE>(0), std::numeric_limits<BYTE>::max());
+                    spdlog::info("bTriggerL {}", gamepad->bTriggerL);
+                    break;
+                case 1:
+                    gamepad->bTriggerR = glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(std::numeric_limits<BYTE>::max())), static_cast<BYTE>(0), std::numeric_limits<BYTE>::max());
+                    spdlog::info("bTriggerR {}", gamepad->bTriggerR);
+                    break;
+                case 2:
+                    gamepad->bThumbLY = 128 + glm::clamp(static_cast<BYTE>(i->get()->axes[sdl_event.jaxis.axis].fraction * static_cast<float>(127)), static_cast<BYTE>(0), static_cast<BYTE>(127));
+                    spdlog::info("bThumbLY {}", gamepad->bThumbLY);
+                    break;
+            }
+        } else spdlog::warn("BAD");
     } else if (sdl_event.type == SDL_JOYHATMOTION) {
         spdlog::debug("Joystick hat: {}, {}, {}", sdl_event.jhat.which, sdl_event.jhat.hat, sdl_event.jhat.value);
     } else if (sdl_event.type == SDL_JOYBUTTONDOWN) {
@@ -212,6 +251,7 @@ static bool process_events(SDL_Window *sdl_window) {
     bool should_quit = false;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        ImGui_ImplSDL2_ProcessEvent(&event);
         process_joystick_events(event);
         if (event.type == SDL_QUIT) {
             spdlog::debug("Got quit event.");
@@ -235,28 +275,12 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
     ImFreetypeEnablement freetype;
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     SDL_JoystickEventState(SDL_ENABLE);
-    /*
-    XUSB_REPORT report;
-    report.bLeftTrigger = 0;
-    report.bRightTrigger = 0;
-    report.sThumbLX = 0;
-    report.sThumbLY = 0;
-    report.sThumbRX = 0;
-    report.sThumbRY = 0;
-    report.wButtons = 0;
-    */
+    DS4_REPORT report;
+    DS4_REPORT_INIT(&report);
+    gamepad = &report;
     for (;;) {
-        /*
-        report.bLeftTrigger = rand() % 255;
-        report.bRightTrigger = rand() % 255;
-        report.sThumbLX = -10000 + (rand() % 20000);
-        report.sThumbLY = -10000 + (rand() % 20000);
-        report.sThumbRX = -10000 + (rand() % 20000);
-        report.sThumbRY = -10000 + (rand() % 20000);
-        if (!VIGEM_SUCCESS(vigem_target_x360_update(vigem_client, vigem_pad, report))) return "Failed to update ViGEm gamepad.";
-        fmt::print("{}, {}\n", report.bLeftTrigger, report.bRightTrigger);
-        */
         if (!process_events(sdl_window)) break;
+        if (!VIGEM_SUCCESS(vigem_target_ds4_update(vigem_client, vigem_pad, report))) return "Failed to update ViGEm gamepad.";
         const auto hz = [&]() -> std::optional<int> {
             const auto display_i = SDL_GetWindowDisplayIndex(sdl_window);
             if (display_i < 0) return 60;

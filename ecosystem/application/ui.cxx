@@ -128,39 +128,44 @@ namespace sc::visor {
         */
     }
 
-    static void emit_axis_profile_slice(std::string_view name) {
-        if (ImGui::BeginChild(fmt::format("##{}Window", name).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+    static void emit_axis_profile_slice(std::shared_ptr<sc::visor::joystick> joystick, int axis_i) {
+        auto &axis = joystick->axes[axis_i];
+        const auto label_default = axis.label ? *axis.label : fmt::format("Axis #{}", axis_i);
+        if (ImGui::BeginChild(fmt::format("##{}Window", label_default).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
             if (ImGui::BeginMenuBar()) {
-                ImGui::Text(fmt::format("{} {}", ICON_FA_CUBE, name.data()).data());
+                ImGui::Text(fmt::format("{} {}", ICON_FA_CUBE, label_default).data());
                 ImGui::EndMenuBar();
             }
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::ProgressBar(axis.fraction);
             /*
             if (ImGui::BeginChild(fmt::format("##{}DeadzoneWindow", name).data(), { 0, 100 }, true, ImGuiWindowFlags_MenuBar)) {
                 if (ImGui::BeginMenuBar()) {
                     ImGui::Text(fmt::format("{} Deadzone", ICON_FA_PERCENTAGE).data());
                     ImGui::EndMenuBar();
                 }
-                static int dz_top = 0, dz_bottom = 0;
-                ImGui::PushItemWidth(120);
-                ImGui::SliderInt("Top Deadzone", &dz_top, 0, 15, "%d%%");
-                ImGui::SliderInt("Bottom Deadzone", &dz_bottom, 0, 15, "%d%%");
-                ImGui::PopItemWidth();
+
             }
             ImGui::EndChild();
-            */
-            if (ImGui::BeginChild(fmt::format("##{}DeadzoneWindow", name).data(), { 0, 100 }, true, ImGuiWindowFlags_MenuBar)) {
+            if (ImGui::BeginChild(fmt::format("##{}DeadzoneWindow", label_default).data(), { 0, 100 }, true, ImGuiWindowFlags_MenuBar)) {
                 if (ImGui::BeginMenuBar()) {
                     ImGui::Text(fmt::format("{} Deadzone", ICON_FA_ANCHOR).data());
                     ImGui::EndMenuBar();
                 }
+                static int dz_top = 0, dz_bottom = 0;
+                ImGui::PushItemWidth(120);
+                ImGui::SliderInt("Low Deadzone", &dz_bottom, 0, 15, "%d%%");
+                ImGui::SliderInt("High Deadzone", &dz_top, 0, 15, "%d%%");
+                ImGui::PopItemWidth();
             }
             ImGui::EndChild();
-            if (ImGui::BeginChild(fmt::format("##{}CurveWindow", name).data(), { 340, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+            */
+            if (ImGui::BeginChild(fmt::format("##{}CurveWindow", label_default).data(), { 340, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                 if (ImGui::BeginMenuBar()) {
                     ImGui::Text(fmt::format("{} Curve", ICON_FA_BEZIER_CURVE).data());
                     ImGui::EndMenuBar();
                 }
-                if (ImGui::BeginCombo(fmt::format("##{}CurveOptions", name).data(), "Linear")) {
+                if (ImGui::BeginCombo(fmt::format("##{}CurveOptions", label_default).data(), "Linear")) {
                     ImGui::Selectable("Option 1");
                     ImGui::Selectable("Option 2");
                     ImGui::Selectable("Option 3");
@@ -170,48 +175,44 @@ namespace sc::visor {
                 }
                 ImGui::SameLine();
                 ImGui::Text("Curve Type");
-                static std::vector<glm::ivec2> model_percents = {
-                { 0, 0 },
-                { 20, 20 },
-                { 40, 40 },
-                { 60, 60 },
-                { 80, 80 },
-                { 100, 100 }
-                };
                 {
                     std::vector<glm::dvec2> model;
-                    for (auto &percent : model_percents) model.push_back({
+                    for (auto &percent : axis.model) model.push_back({
                         static_cast<double>(percent.x) / 100.0,
                         static_cast<double>(percent.y) / 100.0
                     });
                     cubic_bezier_plot(model, { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x });
                 }
                 ImGui::PushItemWidth(80);
-                for (int i = 0; i < model_percents.size(); i++) {
-                    if (i == 0 || i == model_percents.size() - 1) continue;
+                for (int i = 0; i < axis.model.size(); i++) {
+                    if (i == 0 || i == axis.model.size() - 1) continue;
                     ImGui::TextDisabled(fmt::format("#{}", i + 1).data());
                     ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data()) && model_percents[i].x > 0) model_percents[i].x--;
+                    if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data()) && axis.model[i].x > 0) axis.model[i].x--;
                     ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data()) && model_percents[i].x < 100) model_percents[i].x++;
+                    if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data()) && axis.model[i].x < 100) axis.model[i].x++;
                     ImGui::SameLine();
-                    if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &model_percents[i].x, 0, 100));
+                    if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &axis.model[i].x, 0, 100));
                     ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && model_percents[i].y > 0) model_percents[i].y--;
+                    if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && axis.model[i].y > 0) axis.model[i].y--;
                     ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && model_percents[i].y < 100) model_percents[i].y++;
+                    if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && axis.model[i].y < 100) axis.model[i].y++;
                     ImGui::SameLine();
                     ImGui::SameLine();
-                    if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &model_percents[i].y, 0, 100));
+                    if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &axis.model[i].y, 0, 100));
                 }
                 ImGui::PopItemWidth();
             }
             ImGui::EndChild();
             ImGui::SameLine();
-            if (ImGui::BeginChild(fmt::format("##{}SettingsWindow", name).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+            if (ImGui::BeginChild(fmt::format("##{}SettingsWindow", label_default).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                 if (ImGui::BeginMenuBar()) {
                     ImGui::Text(fmt::format("{} Settings", ICON_FA_USER_COG).data());
                     ImGui::EndMenuBar();
+                }
+                if (ImGui::InputText(fmt::format("Label##{}TextInput", label_default).data(), axis.label_input_buf, sizeof(axis.label_input_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    axis.label = axis.label_input_buf;
+                    memset(axis.label_input_buf, 0, sizeof(axis.label_input_buf));
                 }
             }
             ImGui::EndChild();
@@ -220,6 +221,11 @@ namespace sc::visor {
     }
 
     static void emit_content_device_panel() {
+        enum class selection_type {
+            axis,
+            button,
+            hat
+        };
         if (joysticks.size()) {
             if (ImGui::BeginTabBar("##DeviceTabBar")) {
                 for (const auto &joy : joysticks) {
@@ -228,6 +234,7 @@ namespace sc::visor {
                     if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, SDL_JoystickName(joy_ptr), joy->instance_id).data())) {
                         if (ImGui::BeginTabBar("##DeviceSpecificsTabBar")) {
                             if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_COG).data())) {
+                                static std::optional<std::pair<selection_type, int>> current_selection;
                                 if (ImGui::BeginChild("##DeviceMiscInformation", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                                     if (ImGui::BeginMenuBar()) {
                                         ImGui::TextDisabled(fmt::format("{} Vendor: {}, Product: {}", ICON_FA_USB, SDL_JoystickGetVendor(joy_ptr), SDL_JoystickGetProduct(joy_ptr)).data());
@@ -240,7 +247,8 @@ namespace sc::visor {
                                         }
                                         if (joy->axes.size()) {
                                             for (int joy_axis_i = 0; joy_axis_i < joy->axes.size(); joy_axis_i++) {
-                                                ImGui::Selectable(fmt::format("{} Axis #{}", ICON_FA_SLIDERS_H, joy_axis_i).data());
+                                                const bool selected = current_selection ? (current_selection->first == selection_type::axis && current_selection->second == joy_axis_i) : false;
+                                                if (ImGui::Selectable(fmt::format("{} Axis #{}", ICON_FA_SLIDERS_H, joy_axis_i).data(), selected)) current_selection = { selection_type::axis, joy_axis_i };
                                             }
                                         } else ImGui::TextDisabled("No axes detected.");
                                         if (joy->hats.size()) {
@@ -256,32 +264,71 @@ namespace sc::visor {
                                     }
                                     ImGui::EndChild();
                                     ImGui::SameLine();
-                                    if (ImGui::BeginChild("##DeviceHardwareItemCalibration", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                                        if (ImGui::BeginMenuBar()) {
-                                            ImGui::Text(fmt::format("{} Calibration", ICON_FA_COGS).data());
-                                            ImGui::EndMenuBar();
-                                        }
-                                        if (ImGui::BeginChild("##{}DeadzoneWindow", { 0, 100 }, true, ImGuiWindowFlags_MenuBar)) {
+                                    if (current_selection) {
+                                        auto &axis = joy->axes[current_selection->second];
+                                        if (ImGui::BeginChild("##DeviceHardwareItemCalibration", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                                             if (ImGui::BeginMenuBar()) {
-                                                ImGui::Text(fmt::format("{} Deadzone", ICON_FA_ANCHOR).data());
+                                                ImGui::Text(fmt::format("{} Calibration", ICON_FA_COGS).data());
                                                 ImGui::EndMenuBar();
                                             }
-                                        }
-                                        ImGui::EndChild();
-                                        if (ImGui::BeginChild("##{}InputRangeWindow", { 0, 100 }, true, ImGuiWindowFlags_MenuBar)) {
-                                            if (ImGui::BeginMenuBar()) {
-                                                ImGui::Text(fmt::format("{} Range", ICON_FA_RULER).data());
-                                                ImGui::EndMenuBar();
+                                            if (ImGui::BeginChild("##{}DeadzoneWindow", { 0, 100 }, true, ImGuiWindowFlags_MenuBar)) {
+                                                if (ImGui::BeginMenuBar()) {
+                                                    ImGui::Text(fmt::format("{} Deadzone", ICON_FA_ANCHOR).data());
+                                                    ImGui::EndMenuBar();
+                                                }
                                             }
+                                            ImGui::EndChild();
+                                            if (ImGui::BeginChild("##{}InputRangeWindow", { 0, 150 }, true, ImGuiWindowFlags_MenuBar)) {
+                                                if (ImGui::BeginMenuBar()) {
+                                                    ImGui::Text(fmt::format("{} Range", ICON_FA_RULER).data());
+                                                    ImGui::EndMenuBar();
+                                                }
+                                                ImGui::ProgressBar((static_cast<float>(axis.val) - std::numeric_limits<int16_t>::min()) / (static_cast<float>(std::numeric_limits<int16_t>::max()) - static_cast<float>(std::numeric_limits<int16_t>::min())), { 0, 0 }, fmt::format("{}", axis.val).data());
+                                                ImGui::SameLine();
+                                                ImGui::Text("Raw Input");
+                                                if (ImGui::Button(fmt::format(" {} ", ICON_FA_ANGLE_RIGHT).data())) {
+                                                    axis.min = axis.val;
+                                                    axis.min_buf = axis.val;
+                                                }
+                                                if (ImGui::IsItemHovered()) {
+                                                    ImGui::BeginTooltip();
+                                                    ImGui::Text("Set the minimum range to the current raw input value.");
+                                                    ImGui::EndTooltip();
+                                                }
+                                                ImGui::SameLine();
+                                                ImGui::PushItemWidth(150);
+                                                if (ImGui::InputInt("Min", &axis.min_buf)) axis.min = axis.min_buf;
+                                                ImGui::SameLine();
+                                                if (ImGui::InputInt("Max", &axis.max_buf)) axis.max = axis.max_buf;
+                                                ImGui::PopItemWidth();
+                                                ImGui::SameLine();
+                                                if (ImGui::Button(fmt::format(" {} ", ICON_FA_ANGLE_LEFT).data())) {
+                                                    axis.max = axis.val;
+                                                    axis.max_buf = axis.val;
+                                                }
+                                                if (ImGui::IsItemHovered()) {
+                                                    ImGui::BeginTooltip();
+                                                    ImGui::Text("Set the maximum range to the current raw input value.");
+                                                    ImGui::EndTooltip();
+                                                }
+                                                if (ImGui::DragIntRange2("Min/Max", &axis.min_buf, &axis.max_buf)) {
+                                                    axis.min = axis.min_buf;
+                                                    axis.max = axis.max_buf;
+                                                }
+                                                ImGui::ProgressBar(axis.fraction, { 0, 0 });
+                                                ImGui::SameLine();
+                                                ImGui::Text("Output Percent");
+                                            }
+                                            ImGui::EndChild();
                                         }
                                         ImGui::EndChild();
                                     }
-                                    ImGui::EndChild();
                                 }
                                 ImGui::EndChild();
                                 ImGui::EndTabItem();
                             }
                             if (ImGui::BeginTabItem(fmt::format("{} Profile", ICON_FA_SLIDERS_H).data())) {
+                                static std::optional<std::pair<selection_type, int>> current_selection;
                                 if (ImGui::BeginChild("##ProfileInformation", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                                     if (ImGui::BeginMenuBar()) {
                                         ImGui::TextDisabled(fmt::format("{}", ICON_FA_FOLDER_OPEN).data());
@@ -304,7 +351,9 @@ namespace sc::visor {
                                         }
                                         if (joy->axes.size()) {
                                             for (int joy_axis_i = 0; joy_axis_i < joy->axes.size(); joy_axis_i++) {
-                                                ImGui::Selectable(fmt::format("{} Axis #{}", ICON_FA_SLIDERS_H, joy_axis_i).data());
+                                                const bool selected = current_selection ? (current_selection->first == selection_type::axis && current_selection->second == joy_axis_i) : false;
+                                                const auto label = joy->axes[joy_axis_i].label ? *joy->axes[joy_axis_i].label : fmt::format("Axis #{}", joy_axis_i);
+                                                if (ImGui::Selectable(fmt::format("{} {}", ICON_FA_SLIDERS_H, label).data(), selected)) current_selection = { selection_type::axis, joy_axis_i };
                                             }
                                         } else ImGui::TextDisabled("No axes detected.");
                                         if (joy->hats.size()) {
@@ -320,7 +369,17 @@ namespace sc::visor {
                                     }
                                     ImGui::EndChild();
                                     ImGui::SameLine();
-                                    emit_axis_profile_slice("Clutch");
+                                    if (current_selection) {
+                                        switch (current_selection->first) {
+                                            case selection_type::axis:
+                                                emit_axis_profile_slice(joy, current_selection->second);
+                                                break;
+                                            case selection_type::button:
+                                                break;
+                                            case selection_type::hat:
+                                                break;
+                                        }
+                                    }
                                 }
                                 ImGui::EndChild();
                                 ImGui::EndTabItem();
@@ -368,13 +427,6 @@ namespace sc::visor {
                 ImGui::Selectable(fmt::format("{} Quit", ICON_FA_SKULL).data());
                 ImGui::EndMenu();
             }
-            /*
-            if (ImGui::BeginMenu(fmt::format("{} Services", ICON_FA_CODE).data())) {
-                ImGui::Selectable(fmt::format("{} Device Firewall", ICON_FA_TOGGLE_ON).data());
-                ImGui::Selectable(fmt::format("{} Virtual Gamepad", ICON_FA_TOGGLE_ON).data());
-                ImGui::EndMenu();
-            }
-            */
             if (ImGui::BeginMenu(fmt::format("{} Devices", ICON_FA_CUBES).data())) {
                 if (joysticks.size()) {
                     for (const auto &joy : joysticks) {

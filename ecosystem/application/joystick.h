@@ -26,6 +26,8 @@ namespace sc::visor {
 
             std::optional<std::string> label;
 
+            char label_input_buf[128] = { 0 };
+
             std::vector<glm::ivec2> model = {
               { 0, 0 },
               { 20, 20 },
@@ -38,6 +40,11 @@ namespace sc::visor {
             int16_t val = 0;
             int16_t min = std::numeric_limits<int16_t>::min();
             int16_t max = std::numeric_limits<int16_t>::max();
+            
+            float fraction = 0;
+
+            int min_buf = std::numeric_limits<int16_t>::min();
+            int max_buf = std::numeric_limits<int16_t>::max();
         };
 
         std::vector<axis> axes;
