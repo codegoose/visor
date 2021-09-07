@@ -1,0 +1,17 @@
+add_library(serial STATIC
+    "serial.cxx"
+)
+
+target_link_libraries(serial
+    CONAN_PKG::spdlog
+    CONAN_PKG::fmt
+    CONAN_PKG::tl-expected
+)
+
+add_executable(serial_test
+    "test.cxx"
+)
+
+target_link_libraries(serial_test
+    serial
+)

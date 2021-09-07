@@ -1,0 +1,64 @@
+#include "serial.h"
+
+#include <spdlog/spdlog.h>
+#include <fmt/format.h>
+
+std::optional<std::string> sc::serial::comm_instance::open(const std::string_view &port, std::optional<DWORD> baud_rate) {
+    if (const auto err = close(); err) return err;
+    this->port = port;
+    io_handle = CreateFileA(port.data(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,  NULL);
+    if (io_handle != INVALID_HANDLE_VALUE) {
+        DCB params = { 0 };
+        if (GetCommState(io_handle, &params)) {
+            params.BaudRate = baud_rate ? *baud_rate : 9600;
+            params.ByteSize = 8;
+            params.StopBits = ONESTOPBIT;
+            params.Parity = NOPARITY;
+            params.fDtrControl = DTR_CONTROL_ENABLE;
+            if (SetCommState(io_handle, &params)) {
+                PurgeComm(io_handle, PURGE_RXCLEAR | PURGE_TXCLEAR);
+                spdlog::debug("Opened COMM port: {}, {}", port, params.BaudRate);
+                connected = true;
+                return std::nullopt;
+            } else {
+                close();
+                return fmt::format("Unable to get set serial parameterse for COMM port: {}, {}", port, params.BaudRate);
+            }
+        } else {
+            close();
+            return fmt::format("Unable to get current serial parameters for COMM port: {}", port);
+        }
+    } else {
+        return fmt::format("Unable to open COMM port: {}", port);
+    }
+}
+
+std::optional<std::string> sc::serial::comm_instance::close() {
+    if (io_handle != INVALID_HANDLE_VALUE) {
+        if (!CloseHandle(io_handle)) spdlog::warn("Unable to close COMM port: {}", *port);
+        else spdlog::debug("Closed COMM port: {}", *port);
+        io_handle = INVALID_HANDLE_VALUE;
+    }
+    port = std::nullopt;
+    connected = false;
+    return std::nullopt;
+}
+
+tl::expected<std::vector<std::byte>, std::string> sc::serial::comm_instance::read() {
+    if (!connected) return tl::make_unexpected("Not connected.");
+    if (!ClearCommError(io_handle, &error, &status)) return tl::make_unexpected("Unable to get current status of COMM port.");
+    if (status.cbInQue == 0) return { };
+    std::vector<std::byte> buffer(status.cbInQue);
+    DWORD num_bytes_read;
+    if (!ReadFile(io_handle, buffer.data(), buffer.size(), &num_bytes_read, NULL)) return tl::make_unexpected("Unable to read from COMM port.");
+    if (num_bytes_read != buffer.size()) buffer.resize(num_bytes_read);
+    return buffer;
+}
+
+std::optional<std::string> sc::serial::comm_instance::write(const std::vector<std::byte> &input) {
+    return "Not impemented.";
+}
+
+sc::serial::comm_instance::~comm_instance() {
+    close();    
+}
