@@ -360,7 +360,7 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
 
 int main() {
     #ifdef NDEBUG
-    sc::sentry::initialize("https://f4a284ccd2194db2982e121f4c3f8e1b@o881067.ingest.sentry.io/5942037", fmt::format("{}@{}", pystring::lower(SC_APP_NAME), SC_APP_VER).data());
+    sc::sentry::initialize("https://f4a284ccd2194db2982e121f4c3f8e1b@o881067.ingest.sentry.io/5942037", fmt::format("{}@{}", pystring::lower(SC_APP_NAME), SC_SENTRY_APP_VER).data());
     DEFER(sc::sentry::shutdown());
     #endif
     spdlog::set_default_logger(spdlog::stdout_color_mt("visor"));
