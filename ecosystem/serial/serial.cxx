@@ -56,7 +56,14 @@ tl::expected<std::vector<std::byte>, std::string> sc::serial::comm_instance::rea
 }
 
 std::optional<std::string> sc::serial::comm_instance::write(const std::vector<std::byte> &input) {
-    return "Not impemented.";
+    if (!connected) return "Not connected.";
+    DWORD num_bytes_written;
+    if (!WriteFile(io_handle, input.data(), input.size(), &num_bytes_written, NULL)) {
+        ClearCommError(io_handle, &error, &status);
+        return "Unable to write data.";
+    }
+    if (num_bytes_written != input.size()) return "Unable to write entire packet.";
+    return std::nullopt;
 }
 
 sc::serial::comm_instance::~comm_instance() {
