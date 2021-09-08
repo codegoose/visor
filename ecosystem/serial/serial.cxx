@@ -10,7 +10,7 @@ std::optional<std::string> sc::serial::comm_instance::open(const std::string_vie
     if (io_handle != INVALID_HANDLE_VALUE) {
         DCB params = { 0 };
         if (GetCommState(io_handle, &params)) {
-            params.BaudRate = baud_rate ? *baud_rate : 9600;
+            params.BaudRate = baud_rate ? *baud_rate : 115200;
             params.ByteSize = 8;
             params.StopBits = ONESTOPBIT;
             params.Parity = NOPARITY;
