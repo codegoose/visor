@@ -4,41 +4,10 @@
             "name": "Default",
             "cppStandard": "c++17",
             "includePath": [
-                "C:/Users/Brandon/.conan/data/sentry-native/0.4.11/_/_/package/17ebbf17df13a19f0651a1b305073872955ee3d9/include",
-                "C:/Users/Brandon/.conan/data/stb/20200203/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
-                "C:/Users/Brandon/.conan/data/tl-expected/20190710/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
-                "C:/Users/Brandon/.conan/data/freetype/2.10.4/_/_/package/c69bad48274e7fc45c887cddc32aa0459f0a81e0/include",
-                "C:/Users/Brandon/.conan/data/freetype/2.10.4/_/_/package/c69bad48274e7fc45c887cddc32aa0459f0a81e0/include/freetype2",
-                "C:/Users/Brandon/.conan/data/spdlog/1.9.1/_/_/package/fc6983b74772bc0fec6c8c5701962c5554112e61/include",
-                "C:/Users/Brandon/.conan/data/yaml-cpp/0.7.0/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
-                "C:/Users/Brandon/.conan/data/sdl/2.0.16/_/_/package/39380f4f7a6ed9bd408fbb5f7be4eb5c380f5a26/include",
-                "C:/Users/Brandon/.conan/data/sdl/2.0.16/_/_/package/39380f4f7a6ed9bd408fbb5f7be4eb5c380f5a26/include/SDL2",
-                "C:/Users/Brandon/.conan/data/glad/0.1.34/_/_/package/07b3a6a6cf6872693cd25f3ba34045fb28115ad7/include",
-                "C:/Users/Brandon/.conan/data/glm/0.9.9.8/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
-                "C:/Users/Brandon/.conan/data/imgui/1.83/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
-                "C:/Users/Brandon/.conan/data/glbinding/3.1.0/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
-                "C:/Users/Brandon/.conan/data/sol2/3.2.3/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
-                "C:/Users/Brandon/.conan/data/libcurl/7.78.0/_/_/package/0a15b3554d54d89968fdd6ac216f2471a295beb6/include",
-                "C:/.conan/fdfa63/1/include",
-                "C:/.conan/fdfa63/1/include/crashpad/mini_chromium",
-                "C:/.conan/fdfa63/1/include/crashpad",
-                "C:/Users/Brandon/.conan/data/libpng/1.6.37/_/_/package/8b1ef0ec9599374db4689199730c00a0d5f4de36/include",
-                "C:/Users/Brandon/.conan/data/bzip2/1.0.8/_/_/package/589a23dff5fdb23a7fb851223eb766480ead0a9a/include",
-                "C:/Users/Brandon/.conan/data/brotli/1.0.9/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
-                "C:/Users/Brandon/.conan/data/brotli/1.0.9/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include/brotli",
-                "C:/Users/Brandon/.conan/data/fmt/8.0.1/_/_/package/8ed2451fe8e6a2dd1b2f8bac3c035717ff9ddfa8/include",
-                "C:/Users/Brandon/.conan/data/lua/5.3.5/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
-                "C:/Users/Brandon/.conan/data/openssl/1.1.1k/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
-                "C:/Users/Brandon/.conan/data/zlib/1.2.11/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
-                "C:/Users/Brandon/.conan/data/pystring/1.1.3/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include"
+
             ],
             "defines": [
-                "CURL_STATICLIB=1",
-                "_NOEXCEPT=noexcept",
-                "SPDLOG_COMPILED_LIB",
-                "SPDLOG_FMT_EXTERNAL",
-                "STB_TEXTEDIT_KEYTYPE=unsigned",
-                "SENTRY_BUILD_STATIC"
+
             ]
         }
     ],
