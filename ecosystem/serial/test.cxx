@@ -13,7 +13,8 @@ const auto comm_port = "\\\\.\\COM7";
 0x69
   ? -- Hardware Check
   I -- Informational Text
-  C -- Initialize/Clear EEPROM
+  CL -- Initialize EEPROM, Low
+  CL -- Initialize EEPROM, High
   Q -- Get EEPROM
 */
 
