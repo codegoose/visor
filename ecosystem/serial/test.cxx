@@ -7,7 +7,7 @@
 #include "../defer.hpp"
 #include "serial.h"
 
-const auto comm_port = "\\\\.\\COM7";
+const auto comm_port = "\\\\.\\COM5";
 
 /*
 0x69
@@ -16,6 +16,7 @@ const auto comm_port = "\\\\.\\COM7";
   CL -- Initialize EEPROM, Low
   CL -- Initialize EEPROM, High
   Q -- Get EEPROM
+  PA[0/1/2] -- Poll Axis #
 */
 
 tl::expected<std::optional<nlohmann::json>, std::string> get_document(sc::serial::comm_instance &comm, const std::vector<std::byte> &message, bool expect_json = true) {
@@ -105,6 +106,11 @@ int main() {
         return 3;
     }
     spdlog::info("EEPROM is working okay.");
+    for (auto c : { '0', '1', '2' }) {
+        if (const auto axis = get_document(comm, { static_cast<std::byte>(0x69), static_cast<std::byte>('P'), static_cast<std::byte>('A'), static_cast<std::byte>(c) }); axis.has_value()) {
+            spdlog::info("Polled axis 0 successfully.");
+        } else spdlog::error("Unable to poll axis {}.", c);
+    }
     spdlog::info("Tests completed.");
     return 0;
 }
