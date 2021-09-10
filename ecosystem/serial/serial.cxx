@@ -1,7 +1,27 @@
 #include "serial.h"
 
+#include <locale>
+#include <codecvt>
+
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
+
+#include "winreg.hpp"
+
+tl::expected<std::vector<std::string>, std::string> sc::serial::list_ports() {
+    std::vector<std::string> list;
+    winreg::RegKey key;
+    if (const auto res = key.TryOpen(HKEY_LOCAL_MACHINE, L"HARDWARE\\DEVICEMAP\\SERIALCOMM", KEY_READ); !res) return tl::make_unexpected("Unable to open registry key.");
+    for (const auto &value : key.EnumValues()) {
+        try {
+            const auto comm_port_name = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key.GetStringValue(value.first));
+            list.push_back(fmt::format("\\\\.\\{}", comm_port_name));
+        } catch (...) {
+            // ...
+        }
+    }
+    return list;
+}
 
 std::optional<std::string> sc::serial::comm_instance::open(const std::string_view &port, std::optional<DWORD> baud_rate) {
     if (const auto err = close(); err) return err;
@@ -22,7 +42,7 @@ std::optional<std::string> sc::serial::comm_instance::open(const std::string_vie
                 return std::nullopt;
             } else {
                 close();
-                return fmt::format("Unable to get set serial parameterse for COMM port: {}, {}", port, params.BaudRate);
+                return fmt::format("Unable to get set serial parameters for COMM port: {}, {}", port, params.BaudRate);
             }
         } else {
             close();

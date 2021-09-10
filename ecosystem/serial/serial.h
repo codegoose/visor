@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -12,6 +13,8 @@
 #include <windows.h>
 
 namespace sc::serial {
+
+    tl::expected<std::vector<std::string>, std::string> list_ports();
 
     struct comm_instance {
 
