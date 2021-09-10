@@ -1,4 +1,5 @@
 #include <thread>
+#include <chrono>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/bin_to_hex.h>
@@ -20,38 +21,25 @@ const auto comm_port = "\\\\.\\COM5";
 */
 
 tl::expected<std::optional<nlohmann::json>, std::string> get_document(sc::serial::comm_instance &comm, const std::vector<std::byte> &message, bool expect_json = true) {
-    if (const auto err = comm.write(message); err) {
-        spdlog::error("Unable to send message.");
-        return tl::make_unexpected("Unable to write to COMM port.");
-    }
-    spdlog::info("Message sent. ({} bytes)", message.size());
+    if (const auto err = comm.write(message); err) return tl::make_unexpected("Unable to write to COMM port.");
     std::vector<std::byte> buffer;
-    spdlog::info("Receiving...");
-    fmt::print("\n");
+    auto last_data_time = std::chrono::high_resolution_clock::now();
     while (buffer.size() == 0 || buffer.back() != static_cast<std::byte>(';')) {
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
         const auto res = comm.read();
-        if (!res.has_value()) {
-            spdlog::error(res.error());
-            return tl::make_unexpected("Unable to read from COMM port.");
+        if (!res.has_value()) return tl::make_unexpected("Unable to read from COMM port.");
+        if (res->size() == 0) {
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - last_data_time).count() > 2000) return tl::make_unexpected("Timed out waiting for data.");
+            else continue;
         }
-        if (res->size() == 0) continue;
-        for (auto &b : *res) fmt::print("{}", static_cast<char>(b));
+        last_data_time = std::chrono::high_resolution_clock::now();
         buffer.insert(buffer.end(), res->begin(), res->end());
     }
-    fmt::print("\n\n");
-    spdlog::info("Got {} bytes in total.", buffer.size());
-    fmt::print("\n");
-    for (auto &b : buffer) fmt::print("{}", static_cast<char>(b));
-    fmt::print("\n{}\n\n", spdlog::to_hex(buffer.begin(), buffer.end()));
     if (expect_json) {
         try {
             const auto doc = nlohmann::json::parse(buffer.begin(), buffer.begin() + (buffer.size() - 1));
-            fmt::print("{}\n\n", doc.dump(2, ' ', true));
-            spdlog::info("Document parsed.");
             return doc;
         } catch (nlohmann::json::exception &exc) {
-            spdlog::error("Unable to parse document.");
             return tl::make_unexpected("Unable to parse data as JSON document.");
         }
     } else return std::nullopt;
@@ -63,53 +51,49 @@ tl::expected<nlohmann::json, std::string> get_eeprom(sc::serial::comm_instance &
     return *eeprom.value();
 }
 
-bool clear_eeprom(sc::serial::comm_instance &comm, bool high = true) {
+std::optional<std::string> clear_eeprom(sc::serial::comm_instance &comm, bool high = true) {
     const auto res = get_document(comm, { static_cast<std::byte>(0x69), static_cast<std::byte>('C'), static_cast<std::byte>(high ? 'H' : 'L') }, false);
-    if (res.has_value() && !res->has_value()) return true;
-    else {
-        spdlog::error(res.error());
-        return false;
-    }
+    if (res.has_value() && !res->has_value()) return std::nullopt;
+    else return res.error();
 }
 
-bool clear_eeprom_check(sc::serial::comm_instance &comm, bool high = true) {
-    if (!clear_eeprom(comm, high)) return false;
+std::optional<std::string> clear_eeprom_check(sc::serial::comm_instance &comm, bool high = true) {
+    if (const auto err = clear_eeprom(comm, high); err) return err.value();
     const auto doc = get_eeprom(comm);
-    if (!doc.has_value()) {
-        spdlog::error(doc.error());
-        return false;
-    }
-    for (auto &value : doc.value()["eeprom"]) if (static_cast<int>(value) != (high ? 255 : 0)) return false;
-    return true;
+    if (!doc.has_value()) return doc.error();
+    for (auto &value : doc.value()["eeprom"]) if (static_cast<int>(value) != (high ? 255 : 0)) return "Read invalid value from EEPROM.";
+    return std::nullopt;
 }
 
-bool verify_eeprom(sc::serial::comm_instance &comm) {
-    return clear_eeprom_check(comm, true) && clear_eeprom_check(comm, false);
+std::optional<std::string> verify_eeprom(sc::serial::comm_instance &comm) {
+    if (const auto err = clear_eeprom_check(comm, true); err) return err.value();
+    if (const auto err = clear_eeprom_check(comm, false); err) return err.value();
+    return std::nullopt;
 }
 
 int main() {
     spdlog::set_level(spdlog::level::debug);
     sc::serial::comm_instance comm;
-    spdlog::debug("{}", reinterpret_cast<void *>(&comm));
     if (const auto err = comm.open(comm_port); err) {
         spdlog::error(*err);
         return 1;
     }
-    DEFER(comm.close());
-    if (const auto info = get_document(comm, { static_cast<std::byte>(0x69), static_cast<std::byte>('I') }); info.has_value()) spdlog::info("Read information from device.");
+    spdlog::info("Getting device information...");
+    if (const auto info = get_document(comm, { static_cast<std::byte>(0x69), static_cast<std::byte>('I') }); info.has_value()) fmt::print("\n{}\n\n", info->value().dump(2));
     else {
-        spdlog::error("Unable to read information from device.");
+        spdlog::error("Unable to read information from device: {}", info.error());
         return 2;
     }
-    if (!verify_eeprom(comm)) {
-        spdlog::error("Unable to verify EEPROM.");
+    spdlog::info("Testing EEPROM...");
+    if (const auto err = verify_eeprom(comm); err) {
+        spdlog::error("Unable to verify EEPROM: {}", err.value());
         return 3;
     }
-    spdlog::info("EEPROM is working okay.");
+    spdlog::info("Checking axes...");
     for (auto c : { '0', '1', '2' }) {
         if (const auto axis = get_document(comm, { static_cast<std::byte>(0x69), static_cast<std::byte>('P'), static_cast<std::byte>('A'), static_cast<std::byte>(c) }); axis.has_value()) {
-            spdlog::info("Polled axis 0 successfully.");
-        } else spdlog::error("Unable to poll axis {}.", c);
+            fmt::print("\n{}\n\n", axis->value().dump(2));
+        } else spdlog::error("Unable to poll axis {}: {}", c, axis.error());
     }
     spdlog::info("Tests completed.");
     return 0;
