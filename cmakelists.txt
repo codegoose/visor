@@ -1,6 +1,23 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(quick)
+add_compile_definitions(
+    $<$<CONFIG:Debug>:SC_DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:SC_RELEASE>
+    $<$<CONFIG:Release>:SC_RELEASE>
+    $<$<CONFIG:MinSizeRel>:SC_RELEASE>
+)
+
+project(simcoaches)
+
+message("Project Source Directory: ${PROJECT_SOURCE_DIR}")
+
+include_directories(
+    "${PROJECT_SOURCE_DIR}/ecosystem/precompiled/rlottie/include"
+)
+
+link_libraries(
+    "${PROJECT_SOURCE_DIR}/ecosystem/precompiled/rlottie/lib/RelWithDebInfo/rlottie.lib"
+)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
