@@ -5,6 +5,7 @@
             "cppStandard": "c++17",
             "includePath": [
 
+                "${workspaceFolder}/ecosystem/precompiled/rlottie/include"
             ],
             "defines": [
 
