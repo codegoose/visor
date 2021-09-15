@@ -23,21 +23,21 @@
 
 #include "application.h"
 
-#include "../storage/storage.h"
+// #include "../storage/storage.h"
 #include "../imgui/imgui_impl_sdl.h"
 #include "../imgui/imgui_impl_opengl3.h"
 #include "../imgui/imgui_freetype.h"
 #include "../imgui/imgui_utils.hpp"
 #include "../defer.hpp"
 #include "../expected.hpp"
-#include "../hidhide/hidhide.h"
+// #include "../hidhide/hidhide.h"
 #include "../boot/gl-proc-address.h"
 #include "../font/imgui.h"
 #include "../systray/systray.h"
 
-#include "../vigem/Client.h"
+// #include "../vigem/Client.h"
 
-XUSB_REPORT *gamepad = nullptr;
+// XUSB_REPORT *gamepad = nullptr;
 
 using namespace gl;
 
@@ -54,20 +54,24 @@ static std::optional<std::string> prepare_styling() {
     return std::nullopt;
 }
 
+/*
 static std::optional<std::filesystem::path> get_module_file_path() {
     TCHAR path[MAX_PATH];
     if (GetModuleFileNameA(NULL, path, sizeof(path)) == 0) return std::nullopt;
     return path;
 }
+*/
 
+/*
 static std::optional<std::string> module_to_whitelist() {
     const auto this_exe = get_module_file_path();
     if (!this_exe) return "Unable to assess module file path.";
     if (!sc::hidhide::set_whitelist({ *this_exe })) return "Unable to update HIDHIDE whitelist.";
     return std::nullopt;
 }
+*/
 
-std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SDL_Window *, ImGuiContext *, PVIGEM_CLIENT, PVIGEM_TARGET)> success_cb) {
+static std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SDL_Window *, ImGuiContext * /*, PVIGEM_CLIENT, PVIGEM_TARGET */)> success_cb) {
     SDL_SetMainReady();
     const glm::ivec2 initial_framebuffer_size { 932, 768 };
     DEFER({
@@ -113,6 +117,7 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
         ImGui_ImplOpenGL3_Shutdown();
     });
     if (const auto styling_err = prepare_styling(); styling_err.has_value()) return styling_err;
+    /*
     const auto vigem_client = vigem_alloc();
     if (vigem_client == nullptr) return "Failed to allocate memory for ViGEm.";
     spdlog::debug("ViGEM client: {}", reinterpret_cast<void *>(vigem_client));
@@ -138,14 +143,16 @@ std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SD
         vigem_target_remove(vigem_client, vigem_pad);
     });
     if (const auto error = module_to_whitelist(); error) return "Unable to add this module to HIDHIDE whitelist.";
+    */
     spdlog::info("Bootstrapping completed.");
-    if (const auto cb_err = success_cb(sdl_window, imgui_ctx, vigem_client, vigem_pad); cb_err.has_value()) {
+    if (const auto cb_err = success_cb(sdl_window, imgui_ctx /* , vigem_client, vigem_pad */); cb_err.has_value()) {
         spdlog::warn("Bootstrap success routine returned an error: {}", *cb_err);
         return cb_err;
     }
     return std::nullopt;
 }
 
+/*
 static bool hide_product(const std::string_view &name) {
     if (!sc::hidhide::is_enabled()) {
         if (!sc::hidhide::set_enabled(true)) {
@@ -182,7 +189,9 @@ static bool hide_product(const std::string_view &name) {
     spdlog::debug("HIDHIDE list updated.");
     return true;
 }
+*/
 
+/*
 static void process_joystick_events(const SDL_Event &sdl_event) {
     if (sdl_event.type == SDL_JOYAXISMOTION) {
         const auto vid = SDL_JoystickGetVendor(SDL_JoystickFromInstanceID(sdl_event.jaxis.which));
@@ -248,13 +257,14 @@ static void process_joystick_events(const SDL_Event &sdl_event) {
         if (i != sc::visor::joysticks.end()) sc::visor::joysticks.erase(i);
     }
 }
+*/
 
 static bool process_events(SDL_Window *sdl_window) {
     bool should_quit = false;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         ImGui_ImplSDL2_ProcessEvent(&event);
-        process_joystick_events(event);
+        // process_joystick_events(event);
         if (event.type == SDL_QUIT) {
             spdlog::debug("Got quit event.");
             should_quit = true;
@@ -267,14 +277,15 @@ static bool process_events(SDL_Window *sdl_window) {
     return true;
 }
 
-#include "../storage/storage-object.h"
+// #include "../storage/storage-object.h"
 
-static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgui_ctx, PVIGEM_CLIENT vigem_client, PVIGEM_TARGET vigem_pad) {
+static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgui_ctx /* , PVIGEM_CLIENT vigem_client, PVIGEM_TARGET vigem_pad */) {
     sc::systray::enable([sdl_window]() {
         SDL_ShowWindow(sdl_window);
         SDL_RestoreWindow(sdl_window);
     });
     DEFER(sc::systray::disable());
+    /*
     if (const auto err = sc::storage::initialize(); err) return err;
     DEFER(sc::storage::shutdown());
     sc::storage::set_flag("accepted-eula", true);
@@ -294,16 +305,17 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
         sc::storage::set_object("user-credentials", out);
     }
     sc::storage::sync();
+    */
     ImDrawCompare im_draw_cache;
     ImFreetypeEnablement freetype;
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     SDL_JoystickEventState(SDL_ENABLE);
-    XUSB_REPORT gamepad_report;
-    XUSB_REPORT_INIT(&gamepad_report);
-    gamepad = &gamepad_report;
+    // XUSB_REPORT gamepad_report;
+    // XUSB_REPORT_INIT(&gamepad_report);
+    // gamepad = &gamepad_report;
     for (;;) {
         if (!process_events(sdl_window)) break;
-        if (!VIGEM_SUCCESS(vigem_target_x360_update(vigem_client, vigem_pad, gamepad_report))) return "Failed to update ViGEm gamepad.";
+        // if (!VIGEM_SUCCESS(vigem_target_x360_update(vigem_client, vigem_pad, gamepad_report))) return "Failed to update ViGEm gamepad.";
         const auto hz = [&]() -> std::optional<int> {
             const auto display_i = SDL_GetWindowDisplayIndex(sdl_window);
             if (display_i < 0) return 60;
