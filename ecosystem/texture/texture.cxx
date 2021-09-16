@@ -5,14 +5,15 @@
 
 using namespace gl;
 
+#include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include <stb_image.h>
 #include <stb_image_resize.h>
 #include <rlottie_capi.h>
 
-tl::expected<sc::texture::frame, std::string> sc::texture::load_from_memory(void *data_address, const size_t &data_length) {
+tl::expected<sc::texture::frame, std::string> sc::texture::load_from_memory(const std::vector<std::byte> &data) {
     int image_width, image_height;
-    unsigned char *image_data = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(data_address), data_length, &image_width, &image_height, 0, STBI_rgb_alpha);
+    unsigned char *image_data = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(data.data()), data.size(), &image_width, &image_height, 0, STBI_rgb_alpha);
     if (image_data == 0) return tl::make_unexpected("Unrecognized image format or corrupt data.");
     std::vector<std::byte> rgba;
     rgba.resize(image_width * image_height * 4);
@@ -22,9 +23,9 @@ tl::expected<sc::texture::frame, std::string> sc::texture::load_from_memory(void
     return std::move(res);
 }
 
-tl::expected<sc::texture::frame_sequence, std::string> sc::texture::load_lottie_from_memory(const std::string_view &cache_key, void *data_address, const size_t &data_length, const glm::ivec2 &size) {
+tl::expected<sc::texture::frame_sequence, std::string> sc::texture::load_lottie_from_memory(const std::string_view &cache_key, const std::vector<std::byte> &data, const glm::ivec2 &size) {
     try {
-        const auto doc = nlohmann::json::parse(std::string_view(reinterpret_cast<const char *>(data_address), data_length));
+        const auto doc = nlohmann::json::parse(std::string_view(reinterpret_cast<const char *>(data.data()), data.size()));
         const auto str = doc.dump();
         auto animation = lottie_animation_from_data(str.data(), cache_key.data(), "");
         if (!animation) return tl::make_unexpected("Unable to recognize data as Lottie format, or corrupt data.");
@@ -77,6 +78,7 @@ sc::texture::gpu_handle::gpu_handle(const uint32_t &handle, const glm::ivec2 &si
 
 sc::texture::gpu_handle::~gpu_handle() {
     glDeleteTextures(1, &handle);
+    spdlog::debug("Destroyed texture: #{}", handle);
 }
 
 tl::expected<std::shared_ptr<sc::texture::gpu_handle>, std::string> sc::texture::upload_to_gpu(const frame &reference, const glm::ivec2 &size) {
@@ -90,9 +92,11 @@ tl::expected<std::shared_ptr<sc::texture::gpu_handle>, std::string> sc::texture:
         auto scaled_image = resize(reference, size);
         if (scaled_image.has_value()) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, scaled_image->size.x, scaled_image->size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaled_image->content.data());
+            spdlog::debug("Made new texture: #{} ({}x{} -> {}x{})", texture, reference.size.x, reference.size.y, scaled_image->size.x, scaled_image->size.y);
             return std::make_shared<gpu_handle>(texture, size);
-        }
+        } else spdlog::warn("Unable to resize image data for texture: #{}", texture);
     }
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, reference.size.x, reference.size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, reference.content.data());
+    spdlog::debug("Made new texture: #{} ({} by {})", texture, size.x, size.y);
     return std::make_shared<gpu_handle>(texture, size);
 }

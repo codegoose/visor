@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <vector>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -34,8 +35,8 @@ namespace sc::texture {
         const glm::ivec2 size;
     };
 
-    tl::expected<frame, std::string> load_from_memory(void *data_address, const size_t &data_length);
-    tl::expected<frame_sequence, std::string> load_lottie_from_memory(const std::string_view &cache_key, void *data_address, const size_t &data_length, const glm::ivec2 &size);
+    tl::expected<frame, std::string> load_from_memory(const std::vector<std::byte> &data);
+    tl::expected<frame_sequence, std::string> load_lottie_from_memory(const std::string_view &cache_key, const std::vector<std::byte> &data, const glm::ivec2 &size);
     tl::expected<frame, std::string> resize(const frame &reference, const glm::ivec2 &new_size);
     tl::expected<std::shared_ptr<gpu_handle>, std::string> upload_to_gpu(const frame &reference, const glm::ivec2 &size);
 }
