@@ -41,7 +41,7 @@ namespace sc::systray {
         WNDCLASS dummy_window_class = { };
         dummy_window_class.lpfnWndProc = windows_messaging_cb;
         dummy_window_class.hInstance = GetModuleHandle(NULL);
-        dummy_window_class.lpszClassName = "SimCoachesSysTrayClass";
+        dummy_window_class.lpszClassName = "SonicSysTrayClass";
         if (RegisterClass(&dummy_window_class)) {
             if (auto dummy_window = CreateWindow(dummy_window_class.lpszClassName, "Dummy", 0, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, dummy_window_class.hInstance, NULL); dummy_window) {
                 spdlog::debug("Created dummy window for system tray: {}", reinterpret_cast<void *>(dummy_window));
