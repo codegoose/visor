@@ -54,7 +54,6 @@ namespace sc::systray {
                 notify_icon_data.uCallbackMessage = APPWM_ICONNOTIFY;
                 notify_icon_data.hIcon = static_cast<HICON>(LoadImage(dummy_window_class.hInstance, "TRAY_ICON", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
                 if (notify_icon_data.hIcon == NULL) spdlog::warn("Failed to create icon for system tray.");
-                strcpy_s(notify_icon_data.szTip, "Sim Coaches");
                 if (Shell_NotifyIcon(NIM_ADD, &notify_icon_data) == TRUE) {
                     while (worker_running) {
                         MSG msg;
