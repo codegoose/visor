@@ -424,7 +424,7 @@ namespace sc::visor {
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu(fmt::format("{} File", ICON_FA_FILE_CODE).data())) {
                 if (ImGui::Selectable(fmt::format("{} Save", ICON_FA_SAVE).data())) current_view = view::notify_saved_panel;
-                ImGui::Selectable(fmt::format("{} Quit", ICON_FA_SKULL).data());
+                if (ImGui::Selectable(fmt::format("{} Quit", ICON_FA_SKULL).data())) keep_running = false;
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(fmt::format("{} Devices", ICON_FA_CUBES).data())) {
