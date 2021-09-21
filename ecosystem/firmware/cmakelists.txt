@@ -1,0 +1,26 @@
+add_library(firmware STATIC
+    "firmware.cxx"
+    "mk3.cxx"
+)
+
+target_link_libraries(firmware
+    CONAN_PKG::spdlog
+    CONAN_PKG::fmt
+    CONAN_PKG::tl-expected
+    CONAN_PKG::pystring
+
+    hidapi
+)
+
+add_executable(test_firmware_mk3
+    "test_firmware_mk3.cxx"
+)
+
+target_link_libraries(test_firmware_mk3
+    CONAN_PKG::spdlog
+    CONAN_PKG::fmt
+    CONAN_PKG::tl-expected
+    CONAN_PKG::pystring
+
+    firmware
+)
