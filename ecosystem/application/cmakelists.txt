@@ -4,6 +4,7 @@ add_executable(visor
     "joystick.cxx"
     "main.cxx"
     "ui.cxx"
+    "version.cxx"
 )
 
 target_link_libraries(visor
