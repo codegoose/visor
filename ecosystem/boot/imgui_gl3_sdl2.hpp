@@ -40,21 +40,6 @@
 
 #include "../font/imgui.h"
 
-static std::optional<std::string> imgui_prepare_styling() {
-    #ifdef SC_FEATURE_ENHANCED_FONTS
-        if (!sc::font::imgui::load(16)) return "Failed to load fonts.";
-    #endif
-    auto &style = ImGui::GetStyle();
-    style.WindowBorderSize = 1;
-    style.FrameBorderSize = 1;
-    style.FrameRounding = 3.f;
-    style.ChildRounding = 3.f;
-    style.ScrollbarRounding = 3.f;
-    style.WindowRounding = 3.f;
-    style.GrabRounding = 3.f;
-    return std::nullopt;
-}
-
 #include "gl-proc-address.h"
 
 #include <glbinding/gl33core/gl.h>
@@ -65,7 +50,7 @@ using namespace gl;
 
 #include <SDL2/SDL.h>
 
-static std::optional<std::string> bootstrap(std::function<std::optional<std::string>(SDL_Window *, ImGuiContext *)> success_cb) {
+static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std::string>(SDL_Window *, ImGuiContext *)> success_cb) {
         SDL_SetMainReady();
         const glm::ivec2 initial_framebuffer_size { 932, 768 };
         DEFER({
@@ -110,7 +95,9 @@ static std::optional<std::string> bootstrap(std::function<std::optional<std::str
         spdlog::debug("Shutting down ImGui OpenGL3...");
         ImGui_ImplOpenGL3_Shutdown();
     });
-    if (const auto styling_err = imgui_prepare_styling(); styling_err.has_value()) return styling_err;
+    #ifdef SC_FEATURE_ENHANCED_FONTS
+        if (!sc::font::imgui::load(16)) return "Failed to load fonts.";
+    #endif
     spdlog::info("Bootstrapping completed.");
     if (const auto cb_err = success_cb(sdl_window, imgui_ctx /* , vigem_client, vigem_pad */); cb_err.has_value()) {
         spdlog::warn("Bootstrap success routine returned an error: {}", *cb_err);
@@ -119,18 +106,21 @@ static std::optional<std::string> bootstrap(std::function<std::optional<std::str
     return std::nullopt;
 }
 
-static std::optional<std::string> on_startup();
-static tl::expected<bool, std::string> on_system_event(const SDL_Event &event);
-static tl::expected<bool, std::string> on_fixed_update();
-static tl::expected<bool, std::string> on_update(const glm::ivec2 &framebuffer_size);
-static void on_shutdown();
+namespace sc::boot {
 
-static tl::expected<bool, std::string> sdl_process_events(SDL_Window *sdl_window) {
+    static std::optional<std::string> on_startup();
+    static tl::expected<bool, std::string> on_system_event(const SDL_Event &event);
+    static tl::expected<bool, std::string> on_fixed_update();
+    static tl::expected<bool, std::string> on_update(const glm::ivec2 &framebuffer_size);
+    static void on_shutdown();
+}
+
+static tl::expected<bool, std::string> _sc_sdl_process_events(SDL_Window *sdl_window) {
     bool should_quit = false;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         ImGui_ImplSDL2_ProcessEvent(&event);
-        if (const auto res = on_system_event(event); res.has_value()) {
+        if (const auto res = sc::boot::on_system_event(event); res.has_value()) {
             if (!*res) should_quit = true;
         } else return tl::make_unexpected(res.error());
     }
@@ -141,9 +131,9 @@ static tl::expected<bool, std::string> sdl_process_events(SDL_Window *sdl_window
     return true;
 }
 
-static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgui_ctx) {
-    DEFER(on_shutdown());
-    if (const auto res = on_startup(); res.has_value()) return *res;
+static std::optional<std::string> _sc_run(SDL_Window *sdl_window, ImGuiContext *imgui_ctx) {
+    DEFER(sc::boot::on_shutdown());
+    if (const auto res = sc::boot::on_startup(); res.has_value()) return *res;
     #ifdef SC_FEATURE_SYSTEM_TRAY
         sc::systray::enable([sdl_window]() {
             SDL_ShowWindow(sdl_window);
@@ -160,7 +150,7 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     SDL_JoystickEventState(SDL_ENABLE);
     for (;;) {
-        if (const auto res = sdl_process_events(sdl_window); res.has_value()) {
+        if (const auto res = _sc_sdl_process_events(sdl_window); res.has_value()) {
             if (!*res) {
                 spdlog::warn("Quit signalled.");
                 break;
@@ -189,7 +179,12 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
-        on_update(current_framebuffer_size);
+        if (const auto res = sc::boot::on_update(current_framebuffer_size); res.has_value()) {
+            if (!*res) {
+                spdlog::warn("Application wants to exit.");
+                break;
+            }
+        } else return res.error();
         ImGui::Render();
         const auto draw_data = ImGui::GetDrawData();
         const bool framebuffer_size_changed = (current_framebuffer_size.x != recent_framebuffer_size.x || current_framebuffer_size.y != recent_framebuffer_size.y);
@@ -240,7 +235,7 @@ int main() {
         spdlog::critical("This application has been built in DEBUG mode!");
     #endif
     spdlog::info("Program version: {}", SC_APP_VER);
-    if (const auto err = bootstrap(run); err.has_value()) {
+    if (const auto err = _sc_bootstrap(_sc_run); err.has_value()) {
         spdlog::error("An error has occurred: {}", *err);
         std::stringstream ss;
         ss << "This program experienced an error and was unable to continue running:";
