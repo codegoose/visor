@@ -207,7 +207,7 @@ static std::optional<std::string> run(SDL_Window *sdl_window, ImGuiContext *imgu
             recent_framebuffer_size.x = current_framebuffer_size.x;
             recent_framebuffer_size.y = current_framebuffer_size.y;
         }
-        glClearColor(.4, .6, .8, 1);
+        glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         if (static bool shown_window = false; !shown_window) {
             spdlog::debug("First render complete. Making window visible.");
