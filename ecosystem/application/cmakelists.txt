@@ -5,6 +5,7 @@ add_executable(visor
     "main.cxx"
     "ui.cxx"
     "version.cxx"
+    "discovery.cxx"
 )
 
 target_link_libraries(visor

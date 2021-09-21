@@ -34,6 +34,7 @@ static std::optional<std::string> sc::boot::on_startup() {
             }
         } else spdlog::error(sequence.error());
     } else spdlog::error(content.error());
+    visor::discovery::startup();
     return std::nullopt;
 }
 
@@ -52,5 +53,6 @@ static tl::expected<bool, std::string> sc::boot::on_update(const glm::ivec2 &fra
 }
 
 static void sc::boot::on_shutdown() {
+    visor::discovery::shutdown();
     uploaded_frames.clear();
 }
