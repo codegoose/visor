@@ -1,5 +1,7 @@
 #include "texture.h"
 
+#include "../resource/resource.h"
+
 #include <glbinding/glbinding.h>
 #include <glbinding/gl33core/gl.h>
 
@@ -45,7 +47,6 @@ tl::expected<sc::texture::frame_sequence, std::string> sc::texture::load_lottie_
         lottie_animation_destroy(animation);
         const frame_sequence res {
             frame_rate,
-            duration,
             std::move(frames)
         };
         return std::move(res);
@@ -72,16 +73,16 @@ tl::expected<sc::texture::frame, std::string> sc::texture::resize(const frame &r
     return res;
 }
 
-sc::texture::gpu_handle::gpu_handle(const uint32_t &handle, const glm::ivec2 &size) : handle(handle), size(size) {
-    // pass
+sc::texture::gpu_handle::gpu_handle(const uint32_t &handle, const glm::ivec2 &size, const std::optional<std::string> &description) : handle(handle), size(size), description(description) {
+    spdlog::debug("Uploaded to GPU: {} ({}x{}, #{})", description ? *description : "<?>", size.x, size.y, handle);
 }
 
 sc::texture::gpu_handle::~gpu_handle() {
     glDeleteTextures(1, &handle);
-    spdlog::debug("Destroyed texture: #{}", handle);
+    spdlog::debug("Deleted from GPU: {} ({}x{}, #{})", description ? *description : "<?>", size.x, size.y, handle);
 }
 
-tl::expected<std::shared_ptr<sc::texture::gpu_handle>, std::string> sc::texture::upload_to_gpu(const frame &reference, const glm::ivec2 &size) {
+tl::expected<std::shared_ptr<sc::texture::gpu_handle>, std::string> sc::texture::upload_to_gpu(const frame &reference, const glm::ivec2 &size, const std::optional<std::string> &description) {
     GLuint texture;
     glGenTextures(1, &texture);
     if (texture <= 0) return tl::make_unexpected("Unable to allocate a texture ID on the GPU.");
@@ -92,11 +93,9 @@ tl::expected<std::shared_ptr<sc::texture::gpu_handle>, std::string> sc::texture:
         auto scaled_image = resize(reference, size);
         if (scaled_image.has_value()) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, scaled_image->size.x, scaled_image->size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaled_image->content.data());
-            spdlog::debug("Made new texture: #{} ({}x{} -> {}x{})", texture, reference.size.x, reference.size.y, scaled_image->size.x, scaled_image->size.y);
-            return std::make_shared<gpu_handle>(texture, size);
+            return std::make_shared<gpu_handle>(texture, size, description);
         } else spdlog::warn("Unable to resize image data for texture: #{}", texture);
     }
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, reference.size.x, reference.size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, reference.content.data());
-    spdlog::debug("Made new texture: #{} ({} by {})", texture, size.x, size.y);
-    return std::make_shared<gpu_handle>(texture, size);
+    return std::make_shared<gpu_handle>(texture, size, description);
 }
