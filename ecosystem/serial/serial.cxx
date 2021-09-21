@@ -6,7 +6,7 @@
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
 
-#include "winreg.hpp"
+#include "../winreg.hpp"
 
 tl::expected<std::vector<std::string>, std::string> sc::serial::list_ports() {
     std::vector<std::string> list;

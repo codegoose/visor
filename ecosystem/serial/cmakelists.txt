@@ -9,11 +9,3 @@ target_link_libraries(serial
     CONAN_PKG::tl-expected
     CONAN_PKG::nlohmann_json
 )
-
-add_executable(serial_test
-    "test.cxx"
-)
-
-target_link_libraries(serial_test
-    serial
-)
