@@ -90,6 +90,18 @@ std::optional<std::string> sc::serial::mk2::configurator::axis_enable(const int 
     else return std::nullopt;
 }
 
+std::optional<std::string> sc::serial::mk2::configurator::axis_disable(const int &axis_index) {
+    std::optional<char> c;
+    switch (axis_index) {
+        case 0: c = '0'; break;
+        case 1: c = '1'; break;
+        case 2: c = '2'; break;
+        default: return "Invalid axis index.";
+    }
+    if (const auto res = communicate(comm, { static_cast<std::byte>(0x69), static_cast<std::byte>('P'), static_cast<std::byte>('A'), static_cast<std::byte>('D'), static_cast<std::byte>(*c) }, false); !res.has_value()) return res.error();
+    else return std::nullopt;
+}
+
 tl::expected<nlohmann::json, std::string> sc::serial::mk2::configurator::axis_read(const int &axis_index) {
     std::optional<char> c;
     switch (axis_index) {
