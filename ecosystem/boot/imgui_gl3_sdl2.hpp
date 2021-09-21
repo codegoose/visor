@@ -41,6 +41,7 @@
 #include "../font/imgui.h"
 
 #include "gl-proc-address.h"
+#include "gl-dbg-msg-cb.h"
 
 #include <glbinding/gl33core/gl.h>
 
@@ -64,6 +65,7 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
         const auto sdl_window = SDL_CreateWindow(SC_APP_NAME, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, initial_framebuffer_size.x, initial_framebuffer_size.y, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
         if (!sdl_window) return "Failed to create window.";
         DEFER({
@@ -78,6 +80,8 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
     });
     if (SDL_GL_MakeCurrent(sdl_window, gl_context) != 0) return "Failed to activate OpenGL context";
     glbinding::initialize(sc::boot::gl::get_proc_address, false);
+    glDebugMessageCallback(sc::boot::gl::debug_message_callback, nullptr);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     spdlog::debug("GL: {} ({})", glGetString(GL_VERSION), glGetString(GL_RENDERER));
     const auto imgui_ctx = ImGui::CreateContext();
     if (!imgui_ctx) return "Failed to create ImGui context.";

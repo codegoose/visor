@@ -1,3 +1,5 @@
+#pragma once
+
 #include <functional>
 
 #include <glbinding/glbinding.h>
