@@ -61,7 +61,7 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
             SDL_Quit();
         });
         SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) return "Failed to initialize SDL.";
+        if (SDL_Init(SDL_INIT_VIDEO) != 0) return "Failed to initialize SDL.";
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
