@@ -3,11 +3,9 @@
 #define SC_FEATURE_SENTRY
 #define SC_FEATURE_MINIMAL_REDRAW
 #define SC_FEATURE_ENHANCED_FONTS
-#define SC_FEATURE_SYSTEM_TRAY
 
 #include "../boot/imgui_gl3_sdl2.hpp"
 #include "../file/file.h"
-#include "../systray/systray.h"
 #include "../texture/texture.h"
 #include "../imgui/imgui_utils.hpp"
 
