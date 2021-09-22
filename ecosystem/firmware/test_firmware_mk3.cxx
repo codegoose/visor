@@ -19,5 +19,17 @@ int main() {
             return 2;
         }
         spdlog::info("Okay: Firmware MK3 Revision #{}", *res);
+        for (;;) {
+            const auto tell = device->read(4000);
+            if (!tell.has_value()) {
+                spdlog::error(tell.error());
+                continue;
+            }
+            if (!tell.value().has_value()) {
+                spdlog::warn("No data received.");
+                continue;
+            }
+            spdlog::info(reinterpret_cast<const char *>(tell.value().value().data()));
+        }
     }
 }
