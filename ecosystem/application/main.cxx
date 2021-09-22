@@ -1,11 +1,12 @@
 #include "application.h"
+#include "discovery.h"
 
 #define SC_FEATURE_SENTRY
 #define SC_FEATURE_MINIMAL_REDRAW
 #define SC_FEATURE_ENHANCED_FONTS
 
 #include "../boot/imgui_gl3_sdl2.hpp"
-#include "../file/file.h"
+#include "../resource/resource.h"
 #include "../texture/texture.h"
 #include "../imgui/imgui_utils.hpp"
 
@@ -25,15 +26,20 @@ static std::optional<std::string> imgui_prepare_styling() {
 
 static std::optional<std::string> sc::boot::on_startup() {
     imgui_prepare_styling();
-    if (const auto content = sc::file::load("C:/Users/bwhit/Downloads/75839-jump-through-4-hoops.json"); content) {
-        if (const auto sequence = sc::texture::load_lottie_from_memory("test", *content, { 256, 256 }); sequence) {
+    const auto resource_name = "LOTTIE_NOT_FOUND_CONE";
+    if (const auto content = sc::resource::get_resource("DATA", resource_name); content) {
+        std::vector<std::byte> buffer(content->second);
+        memcpy(buffer.data(), content->first, buffer.size());
+        if (const auto sequence = sc::texture::load_lottie_from_memory(resource_name, buffer, { 256, 256 }); sequence) {
+            int frame_i = 0;
             for (const auto &frame : sequence->frames) {
-                if (const auto texture = sc::texture::upload_to_gpu(sequence->frames.front(), sequence->frames.front().size / 2); texture) {
+                const auto description = pystring::lower(fmt::format("<rsc:{}:{}x{}#{}>", resource_name, sequence->frames.front().size.x, sequence->frames.front().size.y, frame_i++));
+                if (const auto texture = sc::texture::upload_to_gpu(sequence->frames.front(), sequence->frames.front().size, description); texture) {
                     uploaded_frames.push_back(*texture);
                 } else spdlog::error(texture.error());
             }
-        } else spdlog::error(sequence.error());
-    } else spdlog::error(content.error());
+        }
+    }
     visor::discovery::startup();
     return std::nullopt;
 }
