@@ -24,7 +24,6 @@ target_link_libraries(visor
     vigem
     systray
     sentry
-    storage
     texture
     file
     cimpl
