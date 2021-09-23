@@ -1,7 +1,6 @@
 add_executable(visor
     "visor.rc"
     "application.cxx"
-    "joystick.cxx"
     "main.cxx"
     "ui.cxx"
     "version.cxx"
@@ -12,7 +11,7 @@ target_link_libraries(visor
     CONAN_PKG::glm
     CONAN_PKG::spdlog
     CONAN_PKG::fmt
-    CONAN_PKG::sdl
+    CONAN_PKG::glfw
     CONAN_PKG::glbinding
     CONAN_PKG::imgui
     CONAN_PKG::freetype
