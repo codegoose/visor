@@ -7,14 +7,15 @@
 #include <string>
 #include <memory>
 
-namespace sc::firmware::mk3 {
+namespace sc::firmware::mk4 {
 
     struct device_handle {
 
+        const std::string uuid;
         void * const ptr;
 
-        device_handle(void * const ptr);
-        device_handle(const device_handle& ) = delete;
+        device_handle(const std::string_view &uuid, void * const ptr);
+        device_handle(const device_handle&) = delete;
         device_handle &operator=(const device_handle &) = delete;
         ~device_handle();
 
@@ -23,5 +24,5 @@ namespace sc::firmware::mk3 {
         tl::expected<int, std::string> version();
     };
 
-    tl::expected<std::vector<std::shared_ptr<device_handle>>, std::string> discover();
+    tl::expected<std::vector<std::shared_ptr<device_handle>>, std::string> discover(const std::optional<std::vector<std::shared_ptr<device_handle>>> &existing = std::nullopt);
 }

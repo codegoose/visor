@@ -1,6 +1,6 @@
 add_library(firmware STATIC
     "firmware.cxx"
-    "mk3.cxx"
+    "mk4.cxx"
 )
 
 target_link_libraries(firmware
@@ -12,11 +12,11 @@ target_link_libraries(firmware
     hidapi
 )
 
-add_executable(test_firmware_mk3
-    "test_firmware_mk3.cxx"
+add_executable(test_firmware_mk4
+    "test_firmware_mk4.cxx"
 )
 
-target_link_libraries(test_firmware_mk3
+target_link_libraries(test_firmware_mk4
     CONAN_PKG::spdlog
     CONAN_PKG::fmt
     CONAN_PKG::tl-expected

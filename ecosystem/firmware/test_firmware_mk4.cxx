@@ -3,11 +3,11 @@
 
 #include "../hidapi/hidapi.h"
 
-#include "mk3.h"
+#include "mk4.h"
 
 int main() {
     spdlog::default_logger()->set_level(spdlog::level::debug);
-    const auto res = sc::firmware::mk3::discover();
+    const auto res = sc::firmware::mk4::discover();
     if (!res.has_value()) {
         spdlog::error(res.error());
         return 1;
