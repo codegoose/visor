@@ -14,7 +14,6 @@
 #include "../boot/imgui_gl3_glfw3.hpp"
 #include "../resource/resource.h"
 #include "../texture/texture.h"
-#include "../imgui/imgui_utils.hpp"
 
 static std::vector<std::shared_ptr<sc::texture::gpu_handle>> uploaded_frames;
 
