@@ -24,14 +24,14 @@ tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std
 	if (const auto devs = hid_enumerate(vendor_id, product_id); devs) {
         auto cur_dev = devs;
         while (cur_dev) {
-            spdlog::debug("Checking MK4 HID @ {} ...", cur_dev->path);
+            // spdlog::debug("Checking MK4 HID @ {} ...", cur_dev->path);
             if (cur_dev->vendor_id == vendor_id && cur_dev->product_id == product_id) {
                 if (existing) {
                     const auto existing_i = std::find_if(existing->begin(), existing->end(), [cur_dev](const std::shared_ptr<device_handle> &existing_handle) {
                         return existing_handle->uuid == cur_dev->path;
                     });
                     if (existing_i != existing->end()) {
-                        spdlog::debug("Skipping MK4 HID @ {} (Already open)", cur_dev->path);
+                        // spdlog::debug("Skipping MK4 HID @ {} (Already open)", cur_dev->path);
                         break;
                     }
                 }
@@ -41,7 +41,7 @@ tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std
                     if (ver_res.has_value()) {
                         handles.push_back(new_device_handle);
                         spdlog::debug("Opened MK4 HID @ {} (Revision #{})", cur_dev->path, ver_res.value());
-                    } else spdlog::warn("Unable to open MK4 HID @ {} (Bad communication)", cur_dev->path);
+                    } else spdlog::error("Unable to open MK4 HID @ {} (Bad communication)", cur_dev->path);
                 }
             }
             cur_dev = cur_dev->next;
