@@ -4,6 +4,12 @@
 #define SC_FEATURE_SENTRY
 #define SC_FEATURE_MINIMAL_REDRAW
 #define SC_FEATURE_ENHANCED_FONTS
+#define SC_FEATURE_RENDER_ON_RESIZE
+
+#define SC_VIEW_INIT_W 800
+#define SC_VIEW_INIT_H 600
+#define SC_VIEW_MIN_W 640
+#define SC_VIEW_MIN_H 480
 
 #include "../boot/imgui_gl3_glfw3.hpp"
 #include "../resource/resource.h"

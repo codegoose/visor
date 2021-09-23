@@ -1,3 +1,5 @@
+#pragma message("[EON] Using GLFW/OpenGL33/ImGui.")
+
 #include <iostream>
 #include <sstream>
 #include <optional>
@@ -51,8 +53,17 @@ using namespace gl;
 
 #include <GLFW/glfw3.h>
 
+static glm::ivec2 _sc_current_framebuffer_size = { 0, 0 };
+
+static void _sc_glfw_window_resize_cb(GLFWwindow *window, int w, int h);
+
 static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std::string>(GLFWwindow *, ImGuiContext *)> success_cb) {
-    const glm::ivec2 initial_framebuffer_size { 932, 768 };
+    #if defined(SC_VIEW_INIT_W) && defined(SC_VIEW_INIT_H)
+        const glm::ivec2 initial_framebuffer_size { SC_VIEW_INIT_W, SC_VIEW_INIT_H };
+        #pragma message("[EON] Using custom initial view dimensions.")
+    #else
+        const glm::ivec2 initial_framebuffer_size { 640, 480 };
+    #endif
     DEFER({
         spdlog::debug("Terminating GLFW...");
         glfwTerminate();
@@ -68,6 +79,13 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
         spdlog::debug("Destroying main window...");
         glfwDestroyWindow(glfw_window);
     });
+    #if defined(SC_VIEW_MIN_W) && defined(SC_VIEW_MIN_H)
+    glfwSetWindowSizeLimits(glfw_window, SC_VIEW_MIN_W, SC_VIEW_MIN_H, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    #endif
+    #ifdef SC_FEATURE_RENDER_ON_RESIZE
+        #pragma message("[EON] Using rendering within window size callback.")
+        glfwSetFramebufferSizeCallback(glfw_window, _sc_glfw_window_resize_cb);
+    #endif
     glfwMakeContextCurrent(glfw_window);
     glbinding::initialize(sc::boot::gl::get_proc_address, false);
     glDebugMessageCallback(sc::boot::gl::debug_message_callback, nullptr);
@@ -90,6 +108,7 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
         ImGui_ImplOpenGL3_Shutdown();
     });
     #ifdef SC_FEATURE_ENHANCED_FONTS
+        #pragma message("[EON] Using Freetype to enhance fonts.")
         if (!sc::font::imgui::load(16)) return "Failed to load fonts.";
     #endif
     spdlog::info("Bootstrapping completed.");
@@ -117,10 +136,51 @@ static tl::expected<bool, std::string> _sc_glfw_process_events(GLFWwindow *glfw_
     return true;
 }
 
+static void _sc_glfw_render() {
+    const auto glfw_window = glfwGetCurrentContext();
+    const auto draw_data = ImGui::GetDrawData();
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    if (static bool shown_window = false; !shown_window) {
+        spdlog::debug("First render complete. Making window visible.");
+        glfwShowWindow(glfw_window);
+        shown_window = true;
+    }
+    ImGui_ImplOpenGL3_RenderDrawData(draw_data);
+    glfwSwapBuffers(glfw_window);
+}
+
+static tl::expected<bool, std::string> _sc_imgui_render() {
+    #ifdef SC_FEATURE_ENHANCED_FONTS
+        static ImFreetypeEnablement freetype;
+        freetype.PreNewFrame();
+    #endif
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    if (const auto res = sc::boot::on_update(_sc_current_framebuffer_size); res.has_value()) {
+        if (!*res) {
+            spdlog::warn("Application wants to exit.");
+            glfwHideWindow(glfwGetCurrentContext());
+            return false;
+        }
+    } else return tl::make_unexpected(res.error());
+    ImGui::Render();
+    return true;
+}
+
+static void _sc_glfw_window_resize_cb(GLFWwindow *window, int w, int h) {
+    _sc_current_framebuffer_size = { w, h };
+    glViewport(0, 0, w, h);
+    _sc_imgui_render();
+    _sc_glfw_render();
+}
+
 static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext *imgui_ctx) {
     DEFER(sc::boot::on_shutdown());
     if (const auto res = sc::boot::on_startup(); res.has_value()) return *res;
     #ifdef SC_FEATURE_SYSTEM_TRAY
+        #pragma message("[EON] Using system tray.")
         sc::systray::enable([glfw_window]() {
             glfwShowWindow(glfw_window);
             glfwRestoreWindow(glfw_window);
@@ -128,10 +188,8 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
         DEFER(sc::systray::disable());
     #endif
     #ifdef SC_FEATURE_MINIMAL_REDRAW
+        #pragma message("[EON] Using redraw minimization.")
         ImDrawCompare im_draw_cache;
-    #endif
-    #ifdef SC_FEATURE_ENHANCED_FONTS
-        ImFreetypeEnablement freetype;
     #endif
     glm::ivec2 recent_framebuffer_size { 0, 0 };
     for (;;) {
@@ -172,26 +230,14 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
             if (hz && hz && *hz != *last_hz) spdlog::debug("Changing refresh rate to {}/second.", *hz);
             last_hz = hz;
         }
-        const auto current_framebuffer_size = [&]() -> glm::ivec2 {
+        _sc_current_framebuffer_size = [&]() -> glm::ivec2 {
             int dw, dh;
             glfwGetFramebufferSize(glfw_window, &dw, &dh);
             return { dw, dh };
         }();
-        #ifdef SC_FEATURE_ENHANCED_FONTS
-            freetype.PreNewFrame();
-        #endif
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        if (const auto res = sc::boot::on_update(current_framebuffer_size); res.has_value()) {
-            if (!*res) {
-                spdlog::warn("Application wants to exit.");
-                break;
-            }
-        } else return res.error();
-        ImGui::Render();
+        _sc_imgui_render();
         const auto draw_data = ImGui::GetDrawData();
-        const bool framebuffer_size_changed = (current_framebuffer_size.x != recent_framebuffer_size.x || current_framebuffer_size.y != recent_framebuffer_size.y);
+        const bool framebuffer_size_changed = (_sc_current_framebuffer_size.x != recent_framebuffer_size.x || _sc_current_framebuffer_size.y != recent_framebuffer_size.y);
         #ifdef SC_FEATURE_MINIMAL_REDRAW
             const bool draw_data_changed = !im_draw_cache.Check(draw_data);
             const bool need_redraw = framebuffer_size_changed || draw_data_changed;
@@ -201,22 +247,13 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
             }
         #endif
         if (framebuffer_size_changed) {
-            spdlog::debug("Framebuffer resized: {} -> {}, {} -> {}", recent_framebuffer_size.x, current_framebuffer_size.x, recent_framebuffer_size.y, current_framebuffer_size.y);
-            glViewport(0, 0, current_framebuffer_size.x, current_framebuffer_size.y);
-            recent_framebuffer_size.x = current_framebuffer_size.x;
-            recent_framebuffer_size.y = current_framebuffer_size.y;
+            spdlog::debug("Framebuffer resized: {} -> {}, {} -> {}", recent_framebuffer_size.x, _sc_current_framebuffer_size.x, recent_framebuffer_size.y, _sc_current_framebuffer_size.y);
+            glViewport(0, 0, _sc_current_framebuffer_size.x, _sc_current_framebuffer_size.y);
+            recent_framebuffer_size.x = _sc_current_framebuffer_size.x;
+            recent_framebuffer_size.y = _sc_current_framebuffer_size.y;
         }
-        glClearColor(0, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
-        if (static bool shown_window = false; !shown_window) {
-            spdlog::debug("First render complete. Making window visible.");
-            glfwShowWindow(glfw_window);
-            shown_window = true;
-        }
-        ImGui_ImplOpenGL3_RenderDrawData(draw_data);
-        glfwSwapBuffers(glfw_window);
+        _sc_glfw_render();
         static uint64_t num_frame_i = 0;
-        spdlog::debug("Rendered frame #{}.", num_frame_i);
         num_frame_i++;
     }
     return std::nullopt;
@@ -229,8 +266,11 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
 int main() {
     #ifdef SC_FEATURE_SENTRY
         #ifdef NDEBUG
+            #pragma message("[EON] Using Sentry.")
             sc::sentry::initialize(SC_SENTRY_DSN, fmt::format("{}@{}", pystring::lower(SC_APP_NAME), SC_APP_VER).data());
             DEFER(sc::sentry::shutdown());
+        #else
+        #pragma message("[EON] Sentry is disabled due for debug build.")
         #endif
     #endif
     spdlog::set_default_logger(spdlog::stdout_color_mt(pystring::lower(SC_APP_NAME)));
