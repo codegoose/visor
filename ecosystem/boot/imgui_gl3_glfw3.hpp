@@ -221,7 +221,7 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
                             }
                         }
                     }
-                } else spdlog::debug("E{}", 1);
+                }
             }
             return 60;
         }();
