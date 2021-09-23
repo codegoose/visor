@@ -5,7 +5,7 @@
 #define SC_FEATURE_MINIMAL_REDRAW
 #define SC_FEATURE_ENHANCED_FONTS
 
-#include "../boot/imgui_gl3_sdl2.hpp"
+#include "../boot/imgui_gl3_glfw3.hpp"
 #include "../resource/resource.h"
 #include "../texture/texture.h"
 #include "../imgui/imgui_utils.hpp"
@@ -42,11 +42,6 @@ static std::optional<std::string> sc::boot::on_startup() {
     }
     visor::discovery::startup();
     return std::nullopt;
-}
-
-static tl::expected<bool, std::string> sc::boot::on_system_event(const SDL_Event &event) {
-    if (event.type == SDL_QUIT) return false;
-    return true;
 }
 
 static tl::expected<bool, std::string> sc::boot::on_fixed_update() {
