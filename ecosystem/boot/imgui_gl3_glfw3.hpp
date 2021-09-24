@@ -1,3 +1,5 @@
+#pragma message(SC_APP_NAME)
+#pragma message(SC_APP_VER)
 #pragma message("[EON] Using GLFW/OpenGL33/ImGui.")
 
 #include <iostream>
@@ -263,7 +265,7 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
 
 #include <pystring.h>
 
-int main() {
+static int _sc_entry_point() {
     #ifdef SC_FEATURE_SENTRY
         #ifdef NDEBUG
             #pragma message("[EON] Using Sentry.")
@@ -291,4 +293,13 @@ int main() {
         return 1;
     }
     return 0;
+}
+
+#ifdef NDEBUG
+#pragma message("Using WinMain.")
+int WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, PSTR _command_line, int _command_show) {
+#else
+int main() {
+#endif
+    return _sc_entry_point();
 }

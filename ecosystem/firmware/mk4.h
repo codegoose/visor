@@ -11,10 +11,11 @@ namespace sc::firmware::mk4 {
 
     struct device_handle {
 
-        const std::string uuid;
+        const uint16_t vendor, product;
+        const std::string org, name, uuid, serial;
         void * const ptr;
 
-        device_handle(const std::string_view &uuid, void * const ptr);
+        device_handle(const uint16_t &vendor, const uint16_t &product, const std::string_view &org, const std::string_view &name, const std::string_view &uuid, const std::string_view &serial, void * const ptr);
         device_handle(const device_handle&) = delete;
         device_handle &operator=(const device_handle &) = delete;
         ~device_handle();

@@ -13,6 +13,4 @@
 namespace sc::visor {
 
     extern std::atomic_bool keep_running;
-
-    void emit_ui(const glm::ivec2 &framebuffer_size);
 }

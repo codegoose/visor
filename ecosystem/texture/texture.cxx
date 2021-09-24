@@ -11,6 +11,7 @@ using namespace gl;
 #include <nlohmann/json.hpp>
 #include <stb_image.h>
 #include <stb_image_resize.h>
+#include <stb_image_write.h>
 #include <rlottie_capi.h>
 
 tl::expected<sc::texture::frame, std::string> sc::texture::load_from_memory(const std::vector<std::byte> &data) {
@@ -26,33 +27,29 @@ tl::expected<sc::texture::frame, std::string> sc::texture::load_from_memory(cons
 }
 
 tl::expected<sc::texture::frame_sequence, std::string> sc::texture::load_lottie_from_memory(const std::string_view &cache_key, const std::vector<std::byte> &data, const glm::ivec2 &size) {
-    try {
-        const auto doc = nlohmann::json::parse(std::string_view(reinterpret_cast<const char *>(data.data()), data.size()));
-        const auto str = doc.dump();
-        auto animation = lottie_animation_from_data(str.data(), cache_key.data(), "");
-        if (!animation) return tl::make_unexpected("Unable to recognize data as Lottie format, or corrupt data.");
-        const auto frame_rate = lottie_animation_get_framerate(animation);
-        const auto num_frames = lottie_animation_get_totalframe(animation);
-        const auto duration = lottie_animation_get_duration(animation);
-        std::vector<frame> frames;
-        frames.reserve(num_frames);
-        for (int i = 0; i < num_frames; i++) {
-            std::vector<std::byte> rgba(size.x * size.y * 4);
-            lottie_animation_render(animation, i, reinterpret_cast<uint32_t *>(rgba.data()), size.x, size.y, size.x * 4);
-            frames.push_back({
-                size,
-                std::move(rgba)
-            });
-        }
-        lottie_animation_destroy(animation);
-        const frame_sequence res {
-            frame_rate,
-            std::move(frames)
-        };
-        return std::move(res);
-    } catch (const nlohmann::json::exception &err) {
-        return tl::make_unexpected("Unable to parse file as JSON format.");
+    const auto data_str = std::string(reinterpret_cast<const char *>(data.data()), data.size());
+    if (!nlohmann::json::accept(data_str)) return tl::make_unexpected("Unable to parse JSON data.");
+    auto animation = lottie_animation_from_data(data_str.c_str(), cache_key.data(), "");
+    if (!animation) return tl::make_unexpected("Unable to process file.");
+    const auto frame_rate = lottie_animation_get_framerate(animation);
+    const auto num_frames = lottie_animation_get_totalframe(animation);
+    const auto duration = lottie_animation_get_duration(animation);
+    std::vector<frame> frames;
+    frames.reserve(num_frames);
+    for (int i = 0; i < num_frames; i++) {
+        std::vector<std::byte> rgba(size.x * size.y * 4);
+        lottie_animation_render(animation, i, reinterpret_cast<uint32_t *>(rgba.data()), size.x, size.y, size.x * 4);
+        frames.push_back({
+            size,
+            rgba
+        });
     }
+    lottie_animation_destroy(animation);
+    const frame_sequence res {
+        frame_rate,
+        frames
+    };
+    return res;
 }
 
 tl::expected<sc::texture::frame, std::string> sc::texture::resize(const frame &reference, const glm::ivec2 &new_size) {

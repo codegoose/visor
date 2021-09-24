@@ -2,6 +2,7 @@
 #include "firmware.h"
 
 #include "../hidapi/hidapi.h"
+#include "../defer.hpp"
 
 #include <spdlog/spdlog.h>
 #include <pystring.h>
@@ -9,7 +10,7 @@
 #include <algorithm>
 #include <iostream>
 
-sc::firmware::mk4::device_handle::device_handle(const std::string_view &uuid, void * const ptr) : uuid(uuid), ptr(ptr) {
+sc::firmware::mk4::device_handle::device_handle(const uint16_t &vendor, const uint16_t &product, const std::string_view &org, const std::string_view &name, const std::string_view &uuid, const std::string_view &serial, void * const ptr) : vendor(vendor), product(product), org(org), name(name), uuid(uuid), serial(serial), ptr(ptr) {
 
 }
 
@@ -24,6 +25,7 @@ tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std
 	if (const auto devs = hid_enumerate(vendor_id, product_id); devs) {
         auto cur_dev = devs;
         while (cur_dev) {
+            DEFER(cur_dev = cur_dev->next);
             // spdlog::debug("Checking MK4 HID @ {} ...", cur_dev->path);
             if (cur_dev->vendor_id == vendor_id && cur_dev->product_id == product_id) {
                 if (existing) {
@@ -36,15 +38,23 @@ tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std
                     }
                 }
                 if (const auto handle = hid_open_path(cur_dev->path); handle) {
-                    auto new_device_handle = std::make_shared<device_handle>(cur_dev->path, handle);
+                    std::vector<char> serial_buffer(256);
+                    size_t num_serial_bytes;
+                    if (wcstombs_s(&num_serial_bytes, serial_buffer.data(), serial_buffer.size(), cur_dev->serial_number, serial_buffer.size()) != 0) continue;
+                    std::vector<char> org_buffer(256);
+                    size_t num_org_bytes;
+                    if (wcstombs_s(&num_org_bytes, org_buffer.data(), org_buffer.size(), cur_dev->manufacturer_string, org_buffer.size()) != 0) continue;
+                    std::vector<char> name_buffer(256);
+                    size_t num_name_bytes;
+                    if (wcstombs_s(&num_name_bytes, name_buffer.data(), name_buffer.size(), cur_dev->product_string, name_buffer.size()) != 0) continue;
+                    auto new_device_handle = std::make_shared<device_handle>(cur_dev->vendor_id, cur_dev->product_id, org_buffer.data(), name_buffer.data(), cur_dev->path, serial_buffer.data(), handle);
                     const auto ver_res = new_device_handle->version();
                     if (ver_res.has_value()) {
                         handles.push_back(new_device_handle);
                         spdlog::debug("Opened MK4 HID @ {} (Revision #{})", cur_dev->path, ver_res.value());
-                    } else spdlog::error("Unable to open MK4 HID @ {} (Bad communication)", cur_dev->path);
+                    } else spdlog::warn("Unable to open MK4 HID @ {} (Bad communication)", cur_dev->path);
                 }
             }
-            cur_dev = cur_dev->next;
         }
         hid_free_enumeration(devs);
     }
