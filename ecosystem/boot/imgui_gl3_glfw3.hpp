@@ -237,7 +237,10 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
             glfwGetFramebufferSize(glfw_window, &dw, &dh);
             return { dw, dh };
         }();
-        _sc_imgui_render();
+        if (const auto res = _sc_imgui_render(); res.has_value()) {
+            if (!*res) break;
+        }
+        else return res.error();
         const auto draw_data = ImGui::GetDrawData();
         const bool framebuffer_size_changed = (_sc_current_framebuffer_size.x != recent_framebuffer_size.x || _sc_current_framebuffer_size.y != recent_framebuffer_size.y);
         #ifdef SC_FEATURE_MINIMAL_REDRAW
