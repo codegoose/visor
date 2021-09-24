@@ -12,5 +12,8 @@ void sc::boot::gl::debug_message_callback(GLenum source, GLenum type, GLuint id,
         sentry_capture_event(sentry_event);
     } else if (severity == GL_DEBUG_SEVERITY_MEDIUM) spdlog::warn("GL Error: {}", message);
     else if (severity == GL_DEBUG_SEVERITY_LOW) spdlog::debug("GL Error: {}", message);
-    else spdlog::debug("GL Notification: {}", message);
+    else {
+        if (strstr(message, "GL_STREAM_DRAW") || strstr(message, "GL_STATIC_DRAW")) return; // yeh i know pls stop
+        spdlog::debug("GL Notification: {}", message);
+    }
 }
