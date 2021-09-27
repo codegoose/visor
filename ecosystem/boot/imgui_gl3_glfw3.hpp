@@ -55,6 +55,12 @@ using namespace gl;
 
 #include <GLFW/glfw3.h>
 
+#ifdef SC_FEATURE_TRANSPARENT_WINDOW
+
+    #include <GLFW/glfw3native.h>
+
+#endif
+
 static glm::ivec2 _sc_current_framebuffer_size = { 0, 0 };
 
 static void _sc_glfw_window_resize_cb(GLFWwindow *window, int w, int h);
