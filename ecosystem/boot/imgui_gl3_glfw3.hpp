@@ -104,6 +104,7 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
         spdlog::debug("Destroying ImGui context...");
         ImGui::DestroyContext(imgui_ctx);
     });
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     if (!ImGui_ImplGlfw_InitForOpenGL(glfw_window, true)) return "Failed to prepare ImGui GLFW implementation.";
     DEFER({
         spdlog::debug("Shutting down ImGui GLFW...");
