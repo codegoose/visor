@@ -71,6 +71,11 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
         glfwTerminate();
     });
     if (glfwInit() == GLFW_FALSE) return "Failed to initialize GLFW.";
+    #ifdef SC_FEATURE_TRANSPARENT_WINDOW
+        #pragma message("[EON] Using transparent framebuffer.")
+        glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
+        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    #endif
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
