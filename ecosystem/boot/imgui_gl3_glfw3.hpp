@@ -238,6 +238,14 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
             if (hz && hz && *hz != *last_hz) spdlog::debug("Changing refresh rate to {}/second.", *hz);
             last_hz = hz;
         }
+        {
+            static auto last_info = std::chrono::system_clock::now();
+            const auto now = std::chrono::system_clock::now();
+            if (hz && std::chrono::duration_cast<std::chrono::milliseconds>(now - last_info).count() > 3000) {
+                spdlog::debug("Refresh rate is {}/second.", *hz);
+                last_info = now;
+            }            
+        }
         _sc_current_framebuffer_size = [&]() -> glm::ivec2 {
             int dw, dh;
             glfwGetFramebufferSize(glfw_window, &dw, &dh);
