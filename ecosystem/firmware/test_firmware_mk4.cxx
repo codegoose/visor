@@ -18,7 +18,8 @@ int main() {
             spdlog::error(res.error());
             return 2;
         }
-        spdlog::info("Okay: Firmware MK3 Revision #{}", *res);
+        spdlog::info("Firmware version: MK {}.{}.{}", std::get<0>(*res), std::get<1>(*res), std::get<2>(*res));
+        /*
         for (;;) {
             const auto tell = device->read(4000);
             if (!tell.has_value()) {
@@ -31,5 +32,7 @@ int main() {
             }
             spdlog::info(reinterpret_cast<const char *>(tell.value().value().data()));
         }
+        */
     }
+    return 0;
 }

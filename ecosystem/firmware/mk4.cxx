@@ -5,8 +5,11 @@
 #include "../defer.hpp"
 
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/bin_to_hex.h>
 #include <pystring.h>
+#include <botan/auto_rng.h>
 
+#include <tuple>
 #include <algorithm>
 #include <iostream>
 
@@ -48,11 +51,12 @@ tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std
                     size_t num_name_bytes;
                     if (wcstombs_s(&num_name_bytes, name_buffer.data(), name_buffer.size(), cur_dev->product_string, name_buffer.size()) != 0) continue;
                     auto new_device_handle = std::make_shared<device_handle>(cur_dev->vendor_id, cur_dev->product_id, org_buffer.data(), name_buffer.data(), cur_dev->path, serial_buffer.data(), handle);
-                    const auto ver_res = new_device_handle->version();
-                    if (ver_res.has_value()) {
+                    const auto comm_res = new_device_handle->get_new_communications_id();
+                    if (comm_res.has_value()) {
                         handles.push_back(new_device_handle);
-                        spdlog::debug("Opened MK4 HID @ {} (Revision #{})", cur_dev->path, ver_res.value());
-                    } else spdlog::warn("Unable to open MK4 HID @ {} (Bad communication)", cur_dev->path);
+                        spdlog::debug("Opened MK4 HID @ {} (Communications ID: {})", cur_dev->path, comm_res.value());
+                    } else spdlog::warn("Unable to validate MK4 HID @ {} ({})", cur_dev->path, comm_res.error());
+                    new_device_handle->_communications_id = *comm_res;
                 }
             }
         }
@@ -65,7 +69,7 @@ std::optional<std::string> sc::firmware::mk4::device_handle::write(const std::ar
     std::vector<std::byte> buffer(packet.size() + 1);
     buffer[0] = static_cast<std::byte>(0x0);
     memcpy(&buffer[1], packet.data(), packet.size());
-    if (hid_write(reinterpret_cast<hid_device *>(ptr), reinterpret_cast<const unsigned char *>(buffer.data()), buffer.size()) != buffer.size()) return "Unable to communicate with the device.";
+    if (hid_write(reinterpret_cast<hid_device *>(ptr), reinterpret_cast<const unsigned char *>(buffer.data()), buffer.size()) != buffer.size()) return "Unable to send data to the device.";
     return std::nullopt;
 }
 
@@ -73,21 +77,62 @@ tl::expected<std::optional<std::array<std::byte, 64>>, std::string> sc::firmware
     std::array<std::byte, 64> buff_in;
     const auto num_bytes_read = hid_read_timeout(reinterpret_cast<hid_device *>(ptr), reinterpret_cast<unsigned char *>(buff_in.data()), buff_in.size(), timeout ? *timeout : 0);
     if (num_bytes_read == 0) return std::nullopt;
-    else if (num_bytes_read == -1) return tl::make_unexpected("There was a problem reading from the device.");
+    else if (num_bytes_read == -1) return tl::make_unexpected("Unable to read data from the device.");
     return buff_in;
 }
 
-tl::expected<int, std::string> sc::firmware::mk4::device_handle::version() {
-    if (const auto res = write({
-        static_cast<std::byte>('S'),
-        static_cast<std::byte>('C'),
-        static_cast<std::byte>('V')
-    }); res) return tl::make_unexpected(*res);
-    const auto res = read(2000);
-    if (!res.has_value()) return tl::make_unexpected(res.error());
-    const auto view = std::string_view(reinterpret_cast<const char *>(res->value().data()), strnlen_s(reinterpret_cast<const char *>(res->value().data()), 64));
-    std::vector<std::string> parts;
-    pystring::split(static_cast<std::string>(view), parts, ".");
-    if (parts.size() == 2 && parts[0] == "MK4" && pystring::isdigit(parts[1])) return std::stoi(parts[1]);
-    return tl::make_unexpected("Invalid response.");
+tl::expected<uint16_t, std::string> sc::firmware::mk4::device_handle::get_new_communications_id() {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    buffer[2] = static_cast<std::byte>('!');
+    auto rng = std::make_unique<Botan::AutoSeeded_RNG>();
+    rng->randomize(reinterpret_cast<uint8_t *>(&buffer[3]), 55);
+    spdlog::debug(spdlog::to_hex(buffer));
+    if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return tl::make_unexpected("Timed out waiting for communications ID from device.");
+        const auto res = read(2000);
+        if (!res.has_value()) return tl::make_unexpected(res.error());
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC#", res.value()->data(), 3) != 0) continue;
+        if (memcmp(&buffer.data()[3], &res.value()->data()[5], 55) != 0) continue;
+        uint16_t id;
+        memcpy(&id, &res.value()->data()[3], sizeof(uint16_t));
+        return id;
+    }
+}
+
+tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> sc::firmware::mk4::device_handle::version() {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
+    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    buffer[6] = static_cast<std::byte>('V');
+    if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
+    const auto sent_packet_id = _next_packet_id++;
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return tl::make_unexpected("Timed out waiting for communications ID from device.");
+        const auto res = read(2000);
+        if (!res.has_value()) return tl::make_unexpected(res.error());
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC", res.value()->data(), 2) != 0) continue;
+        uint16_t id, packet_id;
+        memcpy(&id, &res.value()->data()[2], sizeof(id));
+        memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
+        if (id != _communications_id || packet_id != sent_packet_id) {
+            spdlog::error("{}, {}", _communications_id, packet_id);
+            continue;
+        }
+        std::tuple<uint16_t, uint16_t, uint16_t> semver;
+        memcpy(&std::get<0>(semver), &res.value()->data()[6], sizeof(uint16_t));
+        memcpy(&std::get<1>(semver), &res.value()->data()[8], sizeof(uint16_t));
+        memcpy(&std::get<2>(semver), &res.value()->data()[10], sizeof(uint16_t));
+        return semver;
+    }
 }
