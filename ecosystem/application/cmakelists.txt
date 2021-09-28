@@ -4,7 +4,6 @@ add_executable(visor
     "main.cxx"
     "gui.cxx"
     "version.cxx"
-    "discovery.cxx"
 )
 
 target_link_libraries(visor
@@ -16,7 +15,6 @@ target_link_libraries(visor
     CONAN_PKG::imgui
     CONAN_PKG::freetype
     CONAN_PKG::pystring
-    CONAN_PKG::transwarp
 
     boot
     imgui

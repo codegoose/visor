@@ -5,6 +5,7 @@
 #include <vector>
 #include <optional>
 #include <functional>
+#include <future>
 #include <imgui.h>
 #include <fmt/format.h>
 #include <glm/common.hpp>
@@ -13,7 +14,6 @@
 #include <pystring.h>
 
 #include "application.h"
-#include "discovery.h"
 
 #include "../font/font_awesome_5.h"
 #include "../font/font_awesome_5_brands.h"
@@ -22,14 +22,32 @@
 #include "../resource/resource.h"
 #include "../texture/texture.h"
 #include "../file/file.h"
+#include "../firmware/mk4.h"
 
 #include <stb_image_write.h>
 
 namespace sc::visor::gui {
 
-    static std::vector<std::shared_ptr<sc::texture::gpu_handle>> uploaded_frames;
-    static std::shared_future<tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string>> devices_future;
+    static bool animation_play = false;
+    static bool animation_playing = false;
+    static bool animation_loop = false;
+    static double animation_time = 0;
+    static double animation_frame_rate = 0;
+    static size_t animation_frame_i = 0;
+    static std::vector<std::shared_ptr<sc::texture::gpu_handle>> animation_frames;
+
+    static std::optional<std::chrono::high_resolution_clock::time_point> devices_last_scan;
+    static std::future<tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string>> devices_future;
     static std::vector<std::shared_ptr<firmware::mk4::device_handle>> devices;
+
+    struct device_context {
+
+        std::optional<std::chrono::high_resolution_clock::time_point> last_communication;
+        std::shared_ptr<firmware::mk4::device_handle> handle;
+        std::string name, serial;
+    };
+
+    static std::vector<std::shared_ptr<device_context>> device_contexts;
 
     static std::optional<std::string> prepare_styling() {
         auto &style = ImGui::GetStyle();
@@ -46,37 +64,91 @@ namespace sc::visor::gui {
     }
 
     void load_animations() {
-        const auto resource_name = "LOTTIE_NOT_FOUND_CONE";
+        const auto resource_name = "LOTTIE_CUBES";
         if (const auto content = sc::resource::get_resource("DATA", resource_name); content) {
             std::vector<std::byte> buffer(content->second);
             memcpy(buffer.data(), content->first, buffer.size());
             if (const auto sequence = sc::texture::load_lottie_from_memory(resource_name, buffer, { 200, 200 }); sequence.has_value()) {
+                animation_frame_rate = sequence->frame_rate;
                 int frame_i = 0;
                 for (const auto &frame : sequence->frames) {
                     const auto description = pystring::lower(fmt::format("<rsc:{}:{}x{}#{}>", resource_name, sequence->frames.front().size.x, sequence->frames.front().size.y, frame_i++));
                     if (const auto texture = sc::texture::upload_to_gpu(frame, sequence->frames.front().size, description); texture.has_value()) {
-                        uploaded_frames.push_back(*texture);
+                        animation_frames.push_back(*texture);
                     } else spdlog::error(texture.error());
                 }
+                animation_frames.resize(60);
             }
         }
     }
 
     static void scan_for_devices() {
-        devices_future = visor::discovery::find_mk4(devices);
+        animation_play = true;
+        animation_loop = true;
+        devices_future = async(std::launch::async, []() {
+            return sc::firmware::mk4::discover(devices);
+        });
         spdlog::debug("Device scan started.");
     }
 
     static void poll_devices() {
-        if (!devices_future.valid()) return;
-        auto res = devices_future.get();
-        DEFER(devices_future = { });
-        if (!res.has_value()) {
-            spdlog::error(res.error());
-            return;
+        if (devices_future.valid()) {
+            if (devices_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                try {
+                    auto res = devices_future.get();
+                    DEFER({
+                        devices_future = { };
+                        animation_loop = false;
+                    });
+                    if (!res.has_value()) {
+                        spdlog::error(res.error());
+                        return;
+                    }
+                    for (auto &new_device : *res) devices.push_back(new_device);
+                    devices_last_scan = std::chrono::high_resolution_clock::now();
+                    spdlog::debug("Found {} devices.", res->size());
+                } catch(const std::exception& ex) {
+                    spdlog::critical("Exception");
+                }
+            }
+        } else {
+            if (!devices_last_scan) devices_last_scan = std::chrono::high_resolution_clock::now();
+            if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - *devices_last_scan).count() >= 1) scan_for_devices();
         }
-        devices = *res;
-        spdlog::debug("Found {} devices.", res->size());
+        for (auto &device : devices) {
+            const auto contexts_i = std::find_if(device_contexts.begin(), device_contexts.end(), [&device](const std::shared_ptr<device_context> &context) {
+                return context->serial == device->serial;
+            });
+            if (contexts_i != device_contexts.end()) {
+                if (contexts_i->get()->handle.get() != device.get()) {
+                    spdlog::debug("Applying new handle to existing device context. (Serial: {})", device->serial);
+                    contexts_i->get()->handle = device;
+                }
+                continue;
+            }
+            spdlog::debug("Creating new device context. (Serial: {})", device->serial);
+            auto new_device_context = std::make_shared<device_context>();
+            new_device_context->handle = device;
+            new_device_context->name = device->name;
+            new_device_context->serial = device->serial;
+            device_contexts.push_back(new_device_context);
+        }
+        for (auto &context : device_contexts) {
+            if (!context->handle) continue;
+            const auto now = std::chrono::high_resolution_clock::now();
+            if (!context->last_communication) context->last_communication = now;
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - *context->last_communication).count() >= 2) {
+                context->last_communication = now;
+                const auto res = context->handle->version();
+                if (!res) {
+                    spdlog::error("Device context error: {}", res.error());
+                    devices.erase(std::remove_if(devices.begin(), devices.end(), [&](const std::shared_ptr<firmware::mk4::device_handle> &device) {
+                        return device.get() == context->handle.get();
+                    }), devices.end());
+                    context->handle.reset();
+                }
+            }
+        }
     }
 
     enum class view {
@@ -195,10 +267,13 @@ namespace sc::visor::gui {
             button,
             hat
         };
-        if (devices.size()) {
+        if (device_contexts.size()) {
+            animation_time = 0;
             if (ImGui::BeginTabBar("##DeviceTabBar")) {
-                for (const auto &device : devices) {
-                    if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, "Sim Coaches P1 Pro Pedals", device->uuid).data())) {
+                for (const auto &context : device_contexts) {
+                    if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, context->name, context->serial).data())) {
+                        if (context->handle) ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
+                        else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
                         if (ImGui::BeginTabBar("##DeviceSpecificsTabBar")) {
                             if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_COG).data())) {
                                 static std::optional<std::pair<selection_type, int>> current_selection;
@@ -265,9 +340,17 @@ namespace sc::visor::gui {
         } else {
             ImPenUtility pen;
             pen.CalculateWindowBounds();
-            const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(uploaded_frames[11]->size));
+            const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_frames[animation_frame_i]->size));
             ImGui::SetCursorScreenPos(image_pos);
-            if (uploaded_frames.size()) ImGui::Image(reinterpret_cast<ImTextureID>(uploaded_frames[11]->handle), GLMD_IM2(uploaded_frames[11]->size));
+            if (animation_frames.size()) {
+                ImGui::Image(
+                    reinterpret_cast<ImTextureID>(animation_frames[animation_frame_i]->handle),
+                    GLMD_IM2(animation_frames[animation_frame_i]->size),
+                    { 0, 0 },
+                    { 1, 1 },
+                    { 1, 1, 1, animation_playing ? 1 : 0.8f }
+                );
+            }
         }
     }
 
@@ -293,10 +376,11 @@ namespace sc::visor::gui {
                 if (devices.size()) {
                     for (auto &device : devices) ImGui::TextDisabled(fmt::format("{} {} {} (#{})", ICON_FA_MICROCHIP, device->org, device->name, device->serial).data());
                     ImGui::Selectable(fmt::format("{} Clear System Calibrations", ICON_FA_ERASER).data());
-                    if (ImGui::Selectable(fmt::format("{} Release All", ICON_FA_STOP).data())) devices.clear();
-                    ImGui::Separator();
+                    if (ImGui::Selectable(fmt::format("{} Release All", ICON_FA_STOP).data())) {
+                        devices.clear();
+                        device_contexts.clear();
+                    }
                 } else ImGui::TextDisabled("No devices.");
-                if (ImGui::Selectable(fmt::format("{} Scan For Devices", ICON_FA_SATELLITE_DISH).data())) scan_for_devices(); 
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(fmt::format("{} Help", ICON_FA_QUESTION_CIRCLE).data())) {
@@ -317,10 +401,28 @@ void sc::visor::gui::initialize() {
 void sc::visor::gui::shutdown() {
     devices_future = { };
     devices.clear();
-    uploaded_frames.clear();
+    animation_frames.clear();
 }
 
-void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size) {
+void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size, bool *const force_redraw) {
+    static auto last = std::chrono::high_resolution_clock::now();
+    const auto now = std::chrono::high_resolution_clock::now();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last);
+    last = now;
+    if (animation_play && !animation_playing) {
+        animation_time = 0;
+        animation_playing = true;
+        animation_play = false;
+    }
+    if (animation_playing) {
+        const double delta = static_cast<double>(elapsed.count()) / 1000.0;
+        animation_time += delta;
+        if (const auto res = texture::frame_sequence::plot_frame_index(animation_frame_rate, animation_frames.size(), animation_time, animation_loop); res && animation_frame_i != *res) {
+            animation_frame_i = *res;
+            if (force_redraw) *force_redraw = true;
+        }
+        if (!animation_loop && animation_frame_i == animation_frames.size() - 1) animation_playing = false;
+    }
     ImGui::SetNextWindowPos({ 0, 0 }, ImGuiCond_Always);
     ImGui::SetNextWindowSize({ static_cast<float>(framebuffer_size.x), static_cast<float>(framebuffer_size.y) }, ImGuiCond_Always);
     if (ImGui::Begin("##PrimaryWindow", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {

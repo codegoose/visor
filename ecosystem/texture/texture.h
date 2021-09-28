@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <map>
 
 #include <tl/expected.hpp>
 #include <glm/vec2.hpp>
@@ -23,6 +24,8 @@ namespace sc::texture {
 
         double frame_rate;
         std::vector<frame> frames;
+
+        static std::optional<size_t> plot_frame_index(const double &frame_rate, const size_t &num_frames, double &seconds, const bool &wrap = false);
     };
 
     struct gpu_handle {

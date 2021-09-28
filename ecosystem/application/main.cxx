@@ -1,5 +1,4 @@
 #include "application.h"
-#include "discovery.h"
 #include "gui.h"
 
 #define SC_FEATURE_SENTRY
@@ -23,8 +22,8 @@ static tl::expected<bool, std::string> sc::boot::on_fixed_update() {
     return true;
 }
 
-static tl::expected<bool, std::string> sc::boot::on_update(const glm::ivec2 &framebuffer_size) {
-    sc::visor::gui::emit(framebuffer_size);
+static tl::expected<bool, std::string> sc::boot::on_update(const glm::ivec2 &framebuffer_size, bool *const force_redraw) {
+    sc::visor::gui::emit(framebuffer_size, force_redraw);
     return visor::keep_running;
 }
 

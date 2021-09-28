@@ -70,6 +70,17 @@ tl::expected<sc::texture::frame, std::string> sc::texture::resize(const frame &r
     return res;
 }
 
+std::optional<size_t> sc::texture::frame_sequence::plot_frame_index(const double &frame_rate, const size_t &num_frames, double &seconds, const bool &wrap) {
+    if (!num_frames) return std::nullopt;
+    const auto duration = (1.0 / frame_rate) * num_frames;
+    if (!wrap && seconds >= duration) {
+        seconds = duration;
+        return num_frames - 1;
+    }
+    while (seconds >= duration) seconds -= duration;
+    return static_cast<size_t>(((1.0 / duration) * seconds) * num_frames);
+}
+
 sc::texture::gpu_handle::gpu_handle(const uint32_t &handle, const glm::ivec2 &size, const std::optional<std::string> &description) : handle(handle), size(size), description(description) {
     spdlog::debug("Uploaded to GPU: {} ({}x{}, #{})", description ? *description : "<?>", size.x, size.y, handle);
 }

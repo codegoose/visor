@@ -137,7 +137,7 @@ namespace sc::boot {
 
     static std::optional<std::string> on_startup();
     static tl::expected<bool, std::string> on_fixed_update();
-    static tl::expected<bool, std::string> on_update(const glm::ivec2 &framebuffer_size);
+    static tl::expected<bool, std::string> on_update(const glm::ivec2 &framebuffer_size, bool *const force_redraw = nullptr);
     static void on_shutdown();
 }
 
@@ -164,7 +164,7 @@ static void _sc_glfw_render() {
     glfwSwapBuffers(glfw_window);
 }
 
-static tl::expected<bool, std::string> _sc_imgui_render() {
+static tl::expected<bool, std::string> _sc_imgui_render(bool *const force_redraw = nullptr) {
     #ifdef SC_FEATURE_ENHANCED_FONTS
         static ImFreetypeEnablement freetype;
         freetype.PreNewFrame();
@@ -172,7 +172,7 @@ static tl::expected<bool, std::string> _sc_imgui_render() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    if (const auto res = sc::boot::on_update(_sc_current_framebuffer_size); res.has_value()) {
+    if (const auto res = sc::boot::on_update(_sc_current_framebuffer_size, force_redraw); res.has_value()) {
         if (!*res) {
             spdlog::warn("Application wants to exit.");
             glfwHideWindow(glfwGetCurrentContext());
@@ -257,7 +257,12 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
             glfwGetFramebufferSize(glfw_window, &dw, &dh);
             return { dw, dh };
         }();
+        #ifdef SC_FEATURE_MINIMAL_REDRAW
+        bool force_redraw = false;
+        if (const auto res = _sc_imgui_render(&force_redraw); res.has_value()) {
+        #else
         if (const auto res = _sc_imgui_render(); res.has_value()) {
+        #endif
             if (!*res) break;
         }
         else return res.error();
@@ -265,7 +270,7 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
         const bool framebuffer_size_changed = (_sc_current_framebuffer_size.x != recent_framebuffer_size.x || _sc_current_framebuffer_size.y != recent_framebuffer_size.y);
         #ifdef SC_FEATURE_MINIMAL_REDRAW
             const bool draw_data_changed = !im_draw_cache.Check(draw_data);
-            const bool need_redraw = framebuffer_size_changed || draw_data_changed;
+            const bool need_redraw = force_redraw || framebuffer_size_changed || draw_data_changed;
             if (!need_redraw) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000 / (hz ? *hz : 60)));
                 continue;
@@ -318,11 +323,11 @@ static int _sc_entry_point() {
     return 0;
 }
 
-#ifdef NDEBUG
-#pragma message("Using WinMain.")
-int WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, PSTR _command_line, int _command_show) {
-#else
+// #ifdef NDEBUG
+// #pragma message("Using WinMain.")
+// int WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, PSTR _command_line, int _command_show) {
+// #else
 int main() {
-#endif
+// #endif
     return _sc_entry_point();
 }
