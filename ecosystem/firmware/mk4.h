@@ -12,6 +12,13 @@ namespace sc::firmware::mk4 {
 
     struct device_handle {
 
+        struct axis_info {
+
+            bool enabled;
+            int8_t curve_i;
+            uint16_t min, max;
+        };
+
         const uint16_t vendor, product;
         const std::string org, name, uuid, serial;
         void * const ptr;
@@ -28,6 +35,7 @@ namespace sc::firmware::mk4 {
         tl::expected<std::optional<std::array<std::byte, 64>>, std::string> read(const std::optional<int> &timeout = std::nullopt);
         tl::expected<uint16_t, std::string> get_new_communications_id();
         tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> get_version();
+        tl::expected<uint8_t, std::string> get_num_axes();
     };
 
     tl::expected<std::vector<std::shared_ptr<device_handle>>, std::string> discover(const std::optional<std::vector<std::shared_ptr<device_handle>>> &existing = std::nullopt);
