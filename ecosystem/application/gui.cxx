@@ -323,6 +323,7 @@ namespace sc::visor::gui {
         };
         if (device_contexts.size()) {
             animation_scan.time = 0;
+            animation_scan.playing = false;
             if (ImGui::BeginTabBar("##DeviceTabBar")) {
                 for (const auto &context : device_contexts) {
                     if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, context->name, context->serial).data())) {
