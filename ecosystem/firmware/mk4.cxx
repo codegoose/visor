@@ -161,4 +161,36 @@ tl::expected<uint8_t, std::string> sc::firmware::mk4::device_handle::get_num_axe
     }
 }
 
+tl::expected<sc::firmware::mk4::device_handle::axis_info, std::string> sc::firmware::mk4::device_handle::get_axis_state(const int &index) {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
+    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    buffer[6] = static_cast<std::byte>('J');
+    buffer[7] = static_cast<std::byte>('A');
+    buffer[8] = static_cast<std::byte>('S');
+    buffer[9] = static_cast<std::byte>(index);
+    if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
+    const auto sent_packet_id = _next_packet_id++;
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return tl::make_unexpected("Timed out waiting for axis count from device.");
+        const auto res = read(2000);
+        if (!res.has_value()) return tl::make_unexpected(res.error());
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC", res.value()->data(), 2) != 0) continue;
+        uint16_t id, packet_id;
+        memcpy(&id, &res.value()->data()[2], sizeof(id));
+        memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
+        if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
+        axis_info info;
+        info.enabled = static_cast<bool>(res.value()->data()[7]);
+        info.curve_i = static_cast<int8_t>(res.value()->data()[8]);
+        memcpy(&info.min, &res.value()->data()[9], sizeof(info.min));
+        memcpy(&info.max, &res.value()->data()[11], sizeof(info.max));
+        return info;
+    }
 }

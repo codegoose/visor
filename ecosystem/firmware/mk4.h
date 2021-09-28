@@ -36,6 +36,7 @@ namespace sc::firmware::mk4 {
         tl::expected<uint16_t, std::string> get_new_communications_id();
         tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> get_version();
         tl::expected<uint8_t, std::string> get_num_axes();
+        tl::expected<axis_info, std::string> get_axis_state(const int &index);
     };
 
     tl::expected<std::vector<std::shared_ptr<device_handle>>, std::string> discover(const std::optional<std::vector<std::shared_ptr<device_handle>>> &existing = std::nullopt);
