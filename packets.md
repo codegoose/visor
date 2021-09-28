@@ -71,8 +71,8 @@ O ['S']['C'][U16_ID][U16_PACKET_ID][U8_COUNT]
 ## Get Axis State
 
 ```
-I ['S']['C'][U16_ID][U16_PACKET_ID]['J']['A']['S']
-O ['S']['C'][U16_ID][U16_PACKET_ID][BOOL_ENABLED][U8_CURVE][U16_MIN][U16_MAX][U16_VALUE]
+I ['S']['C'][U16_ID][U16_PACKET_ID]['J']['A']['S'][U8_AXIS]
+O ['S']['C'][U16_ID][U16_PACKET_ID][U8_AXIS][BOOL_ENABLED][S8_CURVE][U16_MIN][U16_MAX][U16_VALUE]
 ```
 
 * BOOL_ENABLED is true if the axis is functional at all.
