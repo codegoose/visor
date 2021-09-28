@@ -28,13 +28,41 @@
 
 namespace sc::visor::gui {
 
-    static bool animation_play = false;
-    static bool animation_playing = false;
-    static bool animation_loop = false;
-    static double animation_time = 0;
-    static double animation_frame_rate = 0;
-    static size_t animation_frame_i = 0;
-    static std::vector<std::shared_ptr<sc::texture::gpu_handle>> animation_frames;
+    struct animation_instance {
+
+        bool play = false;
+        bool playing = false;
+        bool loop = false;
+        double time = 0;
+        double frame_rate = 0;
+        size_t frame_i = 0;
+        std::vector<std::shared_ptr<sc::texture::gpu_handle>> frames;
+        std::chrono::high_resolution_clock::time_point last_update = std::chrono::high_resolution_clock::now();
+
+        bool update() {
+            bool changed = false;
+            const auto now = std::chrono::high_resolution_clock::now();
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update);
+            last_update = now;
+            if (play && !playing) {
+                time = 0;
+                playing = true;
+                play = false;
+            }
+            if (playing) {
+                const double delta = static_cast<double>(elapsed.count()) / 1000.0;
+                time += delta;
+                if (const auto res = texture::frame_sequence::plot_frame_index(frame_rate, frames.size(), time, loop); res && frame_i != *res) {
+                    frame_i = *res;
+                    changed = true;
+                }
+                if (!loop && frame_i == frames.size() - 1) playing = false;
+            }
+            return changed;
+        }
+    };
+
+    static animation_instance animation_scan, animation_comm;
 
     static std::optional<std::chrono::high_resolution_clock::time_point> devices_last_scan;
     static std::future<tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string>> devices_future;
@@ -44,7 +72,11 @@ namespace sc::visor::gui {
 
         std::optional<std::chrono::high_resolution_clock::time_point> last_communication;
         std::shared_ptr<firmware::mk4::device_handle> handle;
+        int version_major, version_minor, version_revision;
         std::string name, serial;
+        std::optional<uint8_t> num_axes;
+        std::vector<firmware::mk4::device_handle::axis_info> axes;
+        bool initials_communications_completed = false;
     };
 
     static std::vector<std::shared_ptr<device_context>> device_contexts;
@@ -63,28 +95,31 @@ namespace sc::visor::gui {
         return std::nullopt;
     }
 
-    void load_animations() {
-        const auto resource_name = "LOTTIE_CUBES";
+    void prepare_animation(const std::string_view &resource_name, animation_instance &instance) {
         if (const auto content = sc::resource::get_resource("DATA", resource_name); content) {
             std::vector<std::byte> buffer(content->second);
             memcpy(buffer.data(), content->first, buffer.size());
-            if (const auto sequence = sc::texture::load_lottie_from_memory(resource_name, buffer, { 200, 200 }); sequence.has_value()) {
-                animation_frame_rate = sequence->frame_rate;
+            if (const auto sequence = sc::texture::load_lottie_from_memory(resource_name, buffer, { 180, 180 }); sequence.has_value()) {
+                instance.frame_rate = sequence->frame_rate;
                 int frame_i = 0;
                 for (const auto &frame : sequence->frames) {
                     const auto description = pystring::lower(fmt::format("<rsc:{}:{}x{}#{}>", resource_name, sequence->frames.front().size.x, sequence->frames.front().size.y, frame_i++));
                     if (const auto texture = sc::texture::upload_to_gpu(frame, sequence->frames.front().size, description); texture.has_value()) {
-                        animation_frames.push_back(*texture);
+                        instance.frames.push_back(*texture);
                     } else spdlog::error(texture.error());
                 }
-                animation_frames.resize(60);
             }
         }
     }
 
+    void load_animations() {
+        prepare_animation("LOTTIE_CUBES", animation_scan);
+        prepare_animation("LOTTIE_DIGITAL_COMM", animation_comm);
+    }
+
     static void scan_for_devices() {
-        animation_play = true;
-        animation_loop = true;
+        animation_scan.play = true;
+        animation_scan.loop = true;
         devices_future = async(std::launch::async, []() {
             return sc::firmware::mk4::discover(devices);
         });
@@ -98,7 +133,7 @@ namespace sc::visor::gui {
                     auto res = devices_future.get();
                     DEFER({
                         devices_future = { };
-                        animation_loop = false;
+                        animation_scan.loop = false;
                     });
                     if (!res.has_value()) {
                         spdlog::error(res.error());
@@ -123,6 +158,7 @@ namespace sc::visor::gui {
                 if (contexts_i->get()->handle.get() != device.get()) {
                     spdlog::debug("Applying new handle to existing device context. (Serial: {})", device->serial);
                     contexts_i->get()->handle = device;
+                    contexts_i->get()->initials_communications_completed = false;
                 }
                 continue;
             }
@@ -139,14 +175,32 @@ namespace sc::visor::gui {
             if (!context->last_communication) context->last_communication = now;
             if (std::chrono::duration_cast<std::chrono::seconds>(now - *context->last_communication).count() >= 2) {
                 context->last_communication = now;
-                const auto res = context->handle->version();
-                if (!res) {
-                    spdlog::error("Device context error: {}", res.error());
-                    devices.erase(std::remove_if(devices.begin(), devices.end(), [&](const std::shared_ptr<firmware::mk4::device_handle> &device) {
-                        return device.get() == context->handle.get();
-                    }), devices.end());
-                    context->handle.reset();
+                if (const auto res = context->handle->get_version(); res) {
+                    context->version_major = std::get<0>(*res);
+                    context->version_minor = std::get<1>(*res);
+                    context->version_revision = std::get<2>(*res);
+                } else spdlog::error("Device context error: {}", res.error());
+                if (const auto res = context->handle->get_num_axes(); res) {
+                    context->num_axes = *res;
+                } else spdlog::error("Device context error: {}", res.error());
+                context->axes.clear();
+                for (int i = 0; i < *context->num_axes; i++) {
+                    const auto res = context->handle->get_axis_state(i);
+                    if (!res.has_value()) {
+                        spdlog::error("Device context error: {}", res.error());
+                        break;
+                    }
+                    context->axes.push_back(*res);
                 }
+                if (context->axes.size() == *context->num_axes) {
+                    context->initials_communications_completed = true;
+                    continue;
+                }
+                devices.erase(std::remove_if(devices.begin(), devices.end(), [&](const std::shared_ptr<firmware::mk4::device_handle> &device) {
+                    return device.get() == context->handle.get();
+                }), devices.end());
+                context->initials_communications_completed = false;
+                context->handle.reset();
             }
         }
     }
@@ -268,71 +322,101 @@ namespace sc::visor::gui {
             hat
         };
         if (device_contexts.size()) {
-            animation_time = 0;
+            animation_scan.time = 0;
             if (ImGui::BeginTabBar("##DeviceTabBar")) {
                 for (const auto &context : device_contexts) {
                     if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, context->name, context->serial).data())) {
                         if (context->handle) ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
                         else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
-                        if (ImGui::BeginTabBar("##DeviceSpecificsTabBar")) {
-                            if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_COG).data())) {
-                                static std::optional<std::pair<selection_type, int>> current_selection;
-                                if (ImGui::BeginChild("##DeviceMiscInformation", { 0, 0 }, true)) {
-                                    if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                                        if (ImGui::BeginMenuBar()) {
-                                            ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
-                                            ImGui::EndMenuBar();
-                                        }
-                                    }
-                                    ImGui::EndChild();
-                                    ImGui::SameLine();
-                                }
-                                ImGui::EndChild();
-                                ImGui::EndTabItem();
-                            }
-                            if (ImGui::BeginTabItem(fmt::format("{} Profile", ICON_FA_SLIDERS_H).data())) {
-                                static std::optional<std::pair<selection_type, int>> current_selection;
-                                if (ImGui::BeginChild("##ProfileInformation", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                                    if (ImGui::BeginMenuBar()) {
-                                        ImGui::TextDisabled(fmt::format("{}", ICON_FA_FOLDER_OPEN).data());
-                                        ImGui::SameLine();
-                                        ImGui::SetNextItemWidth(180);
-                                        if (ImGui::BeginCombo("##ProfileSelector", "Default")) {
-                                            ImGui::Selectable("Default");
-                                            ImGui::EndCombo();
-                                        }
-                                        ImGui::SameLine();
-                                        ImGui::Button(fmt::format("{}##ButtonProfileDelete", ICON_FA_MINUS_SQUARE).data());
-                                        ImGui::SameLine();
-                                        ImGui::Button(fmt::format("{}##ButtonProfileAdd", ICON_FA_PLUS_SQUARE).data());
-                                        ImGui::EndMenuBar();
-                                    }
-                                    if (ImGui::BeginChild("##ProfileInputList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                                        if (ImGui::BeginMenuBar()) {
-                                            ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
-                                            ImGui::EndMenuBar();
-                                        }
-                                    }
-                                    ImGui::EndChild();
-                                    ImGui::SameLine();
-                                    if (current_selection) {
-                                        switch (current_selection->first) {
-                                            case selection_type::axis:
-                                                // emit_axis_profile_slice(joy, current_selection->second);
-                                                break;
-                                            case selection_type::button:
-                                                break;
-                                            case selection_type::hat:
-                                                break;
-                                        }
-                                    }
-                                }
-                                ImGui::EndChild();
-                                ImGui::EndTabItem();
-                            }
-                            ImGui::EndTabBar();
+                        if (context->num_axes) {
+                            ImGui::SameLine();
+                            ImGui::TextDisabled(fmt::format("{} axes.", context->axes.size()).data());
                         }
-                        ImGui::EndTabItem();
+                        if (context->initials_communications_completed) {
+                            animation_comm.playing = false;
+                            if (ImGui::BeginTabBar("##DeviceSpecificsTabBar")) {
+                                if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_COG).data())) {
+                                    static std::optional<std::pair<selection_type, int>> current_selection;
+                                    if (ImGui::BeginChild("##DeviceMiscInformation", { 0, 0 }, true)) {
+                                        if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                                            if (ImGui::BeginMenuBar()) {
+                                                ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
+                                                ImGui::EndMenuBar();
+                                            }
+                                            if (context->num_axes) {
+                                                for (int i = 0; i < *context->num_axes; i++) {
+                                                    switch (i) {
+                                                        case 0: ImGui::Selectable("Throttle"); break;
+                                                        case 1: ImGui::Selectable("Brake"); break;
+                                                        case 2: ImGui::Selectable("Clutch"); break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        ImGui::EndChild();
+                                        ImGui::SameLine();
+                                    }
+                                    ImGui::EndChild();
+                                    ImGui::EndTabItem();
+                                }
+                                if (ImGui::BeginTabItem(fmt::format("{} Profile", ICON_FA_SLIDERS_H).data())) {
+                                    static std::optional<std::pair<selection_type, int>> current_selection;
+                                    if (ImGui::BeginChild("##ProfileInformation", { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                                        if (ImGui::BeginMenuBar()) {
+                                            ImGui::TextDisabled(fmt::format("{}", ICON_FA_FOLDER_OPEN).data());
+                                            ImGui::SameLine();
+                                            ImGui::SetNextItemWidth(180);
+                                            if (ImGui::BeginCombo("##ProfileSelector", "Default")) {
+                                                ImGui::Selectable("Default");
+                                                ImGui::EndCombo();
+                                            }
+                                            ImGui::SameLine();
+                                            ImGui::Button(fmt::format("{}##ButtonProfileDelete", ICON_FA_MINUS_SQUARE).data());
+                                            ImGui::SameLine();
+                                            ImGui::Button(fmt::format("{}##ButtonProfileAdd", ICON_FA_PLUS_SQUARE).data());
+                                            ImGui::EndMenuBar();
+                                        }
+                                        if (ImGui::BeginChild("##ProfileInputList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                                            if (ImGui::BeginMenuBar()) {
+                                                ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
+                                                ImGui::EndMenuBar();
+                                            }
+                                        }
+                                        ImGui::EndChild();
+                                        ImGui::SameLine();
+                                        if (current_selection) {
+                                            switch (current_selection->first) {
+                                                case selection_type::axis:
+                                                    // emit_axis_profile_slice(joy, current_selection->second);
+                                                    break;
+                                                case selection_type::button:
+                                                    break;
+                                                case selection_type::hat:
+                                                    break;
+                                            }
+                                        }
+                                    }
+                                    ImGui::EndChild();
+                                    ImGui::EndTabItem();
+                                }
+                                ImGui::EndTabBar();
+                            }
+                            ImGui::EndTabItem();
+                        } else {
+                            if (!animation_comm.playing) animation_comm.time = 164.0 / animation_comm.frame_rate;
+                            animation_comm.playing = true;
+                            animation_comm.loop = true;
+                            ImPenUtility pen;
+                            pen.CalculateWindowBounds();
+                            const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_comm.frames[animation_comm.frame_i]->size));
+                            ImGui::SetCursorScreenPos(image_pos);
+                            if (animation_comm.frames.size()) {
+                                ImGui::Image(
+                                    reinterpret_cast<ImTextureID>(animation_comm.frames[animation_comm.frame_i]->handle),
+                                    GLMD_IM2(animation_comm.frames[animation_comm.frame_i]->size)
+                                );
+                            }
+                        }
                     }
                 }
                 ImGui::EndTabBar();
@@ -340,15 +424,15 @@ namespace sc::visor::gui {
         } else {
             ImPenUtility pen;
             pen.CalculateWindowBounds();
-            const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_frames[animation_frame_i]->size));
+            const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
             ImGui::SetCursorScreenPos(image_pos);
-            if (animation_frames.size()) {
+            if (animation_scan.frames.size()) {
                 ImGui::Image(
-                    reinterpret_cast<ImTextureID>(animation_frames[animation_frame_i]->handle),
-                    GLMD_IM2(animation_frames[animation_frame_i]->size),
+                    reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
+                    GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
                     { 0, 0 },
                     { 1, 1 },
-                    { 1, 1, 1, animation_playing ? 1 : 0.8f }
+                    { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
                 );
             }
         }
@@ -401,28 +485,14 @@ void sc::visor::gui::initialize() {
 void sc::visor::gui::shutdown() {
     devices_future = { };
     devices.clear();
-    animation_frames.clear();
+    animation_scan.frames.clear();
+    animation_comm.frames.clear();
 }
 
 void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size, bool *const force_redraw) {
-    static auto last = std::chrono::high_resolution_clock::now();
-    const auto now = std::chrono::high_resolution_clock::now();
-    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last);
-    last = now;
-    if (animation_play && !animation_playing) {
-        animation_time = 0;
-        animation_playing = true;
-        animation_play = false;
-    }
-    if (animation_playing) {
-        const double delta = static_cast<double>(elapsed.count()) / 1000.0;
-        animation_time += delta;
-        if (const auto res = texture::frame_sequence::plot_frame_index(animation_frame_rate, animation_frames.size(), animation_time, animation_loop); res && animation_frame_i != *res) {
-            animation_frame_i = *res;
-            if (force_redraw) *force_redraw = true;
-        }
-        if (!animation_loop && animation_frame_i == animation_frames.size() - 1) animation_playing = false;
-    }
+    bool animation_scan_updated = animation_scan.update();
+    bool animation_comm_updated = animation_comm.update();
+    if (force_redraw && (animation_scan_updated || animation_comm_updated)) *force_redraw = true;
     ImGui::SetNextWindowPos({ 0, 0 }, ImGuiCond_Always);
     ImGui::SetNextWindowSize({ static_cast<float>(framebuffer_size.x), static_cast<float>(framebuffer_size.y) }, ImGuiCond_Always);
     if (ImGui::Begin("##PrimaryWindow", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {

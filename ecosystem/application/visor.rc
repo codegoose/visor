@@ -13,6 +13,7 @@ FONT_3 DATA ".\\resources\\fa-brands-400.ttf"
 
 LOTTIE_NOT_FOUND_CONE DATA ".\\resources\\36499-page-not-found.json"
 LOTTIE_CUBES DATA ".\\resources\\59621-vrar-cubes.json"
+LOTTIE_DIGITAL_COMM DATA ".\\resources\\41611-interactive-digital-assistant.json"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION SC_FILE_VER
