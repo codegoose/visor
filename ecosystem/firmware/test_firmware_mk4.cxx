@@ -13,7 +13,7 @@ int main() {
         return 1;
     }
     for (auto device : *res) {
-        const auto res = device->version();
+        const auto res = device->get_version();
         if (!res.has_value()) {
             spdlog::error(res.error());
             return 2;
