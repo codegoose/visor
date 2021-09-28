@@ -105,7 +105,7 @@ tl::expected<uint16_t, std::string> sc::firmware::mk4::device_handle::get_new_co
     }
 }
 
-tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> sc::firmware::mk4::device_handle::version() {
+tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> sc::firmware::mk4::device_handle::get_version() {
     std::array<std::byte, 64> buffer;
     memset(buffer.data(), 0, buffer.size());
     buffer[0] = static_cast<std::byte>('S');
@@ -125,10 +125,7 @@ tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> sc::firmware
         uint16_t id, packet_id;
         memcpy(&id, &res.value()->data()[2], sizeof(id));
         memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
-        if (id != _communications_id || packet_id != sent_packet_id) {
-            spdlog::error("{}, {}", _communications_id, packet_id);
-            continue;
-        }
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
         std::tuple<uint16_t, uint16_t, uint16_t> semver;
         memcpy(&std::get<0>(semver), &res.value()->data()[6], sizeof(uint16_t));
         memcpy(&std::get<1>(semver), &res.value()->data()[8], sizeof(uint16_t));

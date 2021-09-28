@@ -27,7 +27,7 @@ namespace sc::firmware::mk4 {
         std::optional<std::string> write(const std::array<std::byte, 64> &packet);
         tl::expected<std::optional<std::array<std::byte, 64>>, std::string> read(const std::optional<int> &timeout = std::nullopt);
         tl::expected<uint16_t, std::string> get_new_communications_id();
-        tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> version();
+        tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> get_version();
     };
 
     tl::expected<std::vector<std::shared_ptr<device_handle>>, std::string> discover(const std::optional<std::vector<std::shared_ptr<device_handle>>> &existing = std::nullopt);
