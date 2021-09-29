@@ -81,8 +81,14 @@ namespace sc::visor::gui {
 
     static std::vector<std::shared_ptr<device_context>> device_contexts;
 
-    static std::optional<std::string> prepare_styling() {
-        auto &style = ImGui::GetStyle();
+    static void prepare_styling_colors(ImGuiStyle &style) {
+        style.Colors[ImGuiCol_Tab] = { 50.f / 255.f, 50.f / 255.f, 50.f / 255.f, 1.f };
+        style.Colors[ImGuiCol_TabActive] = { 70.f / 255.f, 70.f / 255.f, 70.f / 255.f, 1.f };
+        style.Colors[ImGuiCol_TabHovered] = { 90.f / 255.f, 90.f / 255.f, 90.f / 255.f, 1.f };
+        style.Colors[ImGuiCol_WindowBg] = { 30.f / 255.f, 30.f / 255.f, 30.f / 255.f, 1.f };
+    }
+
+    static void prepare_styling_parameters(ImGuiStyle &style) {
         style.WindowBorderSize = 1;
         style.FrameBorderSize = 1;
         style.FrameRounding = 2.f;
@@ -92,6 +98,12 @@ namespace sc::visor::gui {
         style.GrabRounding = 2.f;
         style.TabRounding = 2.f;
         style.Colors[ImGuiCol_ChildBg] = { .09f, .09f, .09f, 1.f };
+    }
+
+    static std::optional<std::string> prepare_styling() {
+        auto &style = ImGui::GetStyle();
+        prepare_styling_parameters(style);
+        prepare_styling_colors(style);
         return std::nullopt;
     }
 
