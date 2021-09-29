@@ -141,22 +141,18 @@ namespace sc::visor::gui {
     static void poll_devices() {
         if (devices_future.valid()) {
             if (devices_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-                try {
-                    auto res = devices_future.get();
-                    DEFER({
-                        devices_future = { };
-                        animation_scan.loop = false;
-                    });
-                    if (!res.has_value()) {
-                        spdlog::error(res.error());
-                        return;
-                    }
-                    for (auto &new_device : *res) devices.push_back(new_device);
-                    devices_last_scan = std::chrono::high_resolution_clock::now();
-                    spdlog::debug("Found {} devices.", res->size());
-                } catch(const std::exception& ex) {
-                    spdlog::critical("Exception");
+                auto res = devices_future.get();
+                DEFER({
+                    devices_future = { };
+                    animation_scan.loop = false;
+                });
+                if (!res.has_value()) {
+                    spdlog::error(res.error());
+                    return;
                 }
+                for (auto &new_device : *res) devices.push_back(new_device);
+                devices_last_scan = std::chrono::high_resolution_clock::now();
+                if (res->size()) spdlog::debug("Found {} devices.", res->size());
             }
         } else {
             if (!devices_last_scan) devices_last_scan = std::chrono::high_resolution_clock::now();
@@ -185,7 +181,7 @@ namespace sc::visor::gui {
             if (!context->handle) continue;
             const auto now = std::chrono::high_resolution_clock::now();
             if (!context->last_communication) context->last_communication = now;
-            if (std::chrono::duration_cast<std::chrono::seconds>(now - *context->last_communication).count() >= 2) {
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *context->last_communication).count() >= 2) {
                 context->last_communication = now;
                 if (const auto res = context->handle->get_version(); res) {
                     context->version_major = std::get<0>(*res);
@@ -216,13 +212,6 @@ namespace sc::visor::gui {
             }
         }
     }
-
-    enum class view {
-        device_panel,
-        notify_saved_panel,
-    };
-
-    static view current_view = view::device_panel;
 
     template<typename A, typename B, typename C> B xy_as(const A &in) {
         return B {
@@ -312,17 +301,101 @@ namespace sc::visor::gui {
         ImGui::SetCursorScreenPos({ bez_area_min.x, bez_area_min.y + bez_area_size.y + ImGui::GetStyle().FramePadding.y });
     }
 
-    static void emit_content_notify_saved_panel() {
-        ImPenUtility pen;
-        pen.CalculateWindowBounds();
-        ImGui::SetCursorScreenPos(pen.GetCenteredPosition({ 300, 150 }));
-        if (ImGui::BeginChild("##NotifySavedWindow", { 300, 150 }, true, ImGuiWindowFlags_MenuBar)) {
+    static void emit_axis_profile_slice(const std::shared_ptr<device_context> &context, int axis_i) {
+        const auto label_default = "Throttle";
+        if (ImGui::BeginChild(fmt::format("##{}Window", label_default).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
             if (ImGui::BeginMenuBar()) {
-                ImGui::Text(fmt::format("Saved", ICON_FA_SITEMAP).data());
+                ImGui::Text(fmt::format("{} {}", ICON_FA_CUBE, label_default).data());
                 ImGui::EndMenuBar();
             }
-            ImGui::Text("All data has been saved.");
-            if (ImGui::Button("Okay")) current_view = view::device_panel;
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::ProgressBar(context->axes[axis_i].input_fraction);
+            ImGui::ProgressBar(context->axes[axis_i].output_fraction);
+            if (ImGui::Button(context->axes[axis_i].enabled ? "Disable this pedal." : "Enable this pedal.")) context->handle->set_axis_enabled(axis_i, !context->axes[axis_i].enabled);
+            if (ImGui::BeginChild(fmt::format("##{}RangeWindow", label_default).data(), { 0, 120 }, true, ImGuiWindowFlags_MenuBar)) {
+                if (ImGui::BeginMenuBar()) {
+                    ImGui::Text(fmt::format("{} Range", ICON_FA_RULER).data());
+                    ImGui::EndMenuBar();
+                }
+                static int dz_top = 0, dz_bottom = 0;
+                ImGui::PushItemWidth(120);
+                ImGui::Text(fmt::format("Minimum Range: {}", context->axes[axis_i].min).data());
+                ImGui::Text(fmt::format("Maximum Range: {}", context->axes[axis_i].max).data());
+                ImGui::Text(fmt::format("Raw Input: {}", context->axes[axis_i].input).data());
+                ImGui::Text(fmt::format("Output: {}", context->axes[axis_i].output).data());
+                ImGui::PopItemWidth();
+            }
+            ImGui::EndChild();
+            if (ImGui::BeginChild(fmt::format("##{}DeadzoneWindow", label_default).data(), { 0, 86 }, true, ImGuiWindowFlags_MenuBar)) {
+                if (ImGui::BeginMenuBar()) {
+                    ImGui::Text(fmt::format("{} Deadzone", ICON_FA_ANCHOR).data());
+                    ImGui::EndMenuBar();
+                }
+                static int dz_top = 0, dz_bottom = 0;
+                ImGui::PushItemWidth(160);
+                ImGui::SliderInt("Low Deadzone", &dz_bottom, 0, 15, "%d%%");
+                ImGui::SliderInt("High Deadzone", &dz_top, 0, 15, "%d%%");
+                ImGui::PopItemWidth();
+            }
+            ImGui::EndChild();
+            /*
+            if (ImGui::BeginChild(fmt::format("##{}CurveWindow", label_default).data(), { 340, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                if (ImGui::BeginMenuBar()) {
+                    ImGui::Text(fmt::format("{} Curve", ICON_FA_BEZIER_CURVE).data());
+                    ImGui::EndMenuBar();
+                }
+                if (ImGui::BeginCombo(fmt::format("##{}CurveOptions", label_default).data(), "Linear")) {
+                    ImGui::Selectable("Option 1");
+                    ImGui::Selectable("Option 2");
+                    ImGui::Selectable("Option 3");
+                    ImGui::Selectable("Option 4");
+                    ImGui::Selectable("Option 5");
+                    ImGui::EndCombo();
+                }
+                ImGui::SameLine();
+                ImGui::Text("Curve Type");
+                {
+                    std::vector<glm::dvec2> model;
+                    for (auto &percent : axis.model) model.push_back({
+                        static_cast<double>(percent.x) / 100.0,
+                        static_cast<double>(percent.y) / 100.0
+                    });
+                    cubic_bezier_plot(model, { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x });
+                }
+                ImGui::PushItemWidth(80);
+                for (int i = 0; i < axis.model.size(); i++) {
+                    if (i == 0 || i == axis.model.size() - 1) continue;
+                    ImGui::TextDisabled(fmt::format("#{}", i + 1).data());
+                    ImGui::SameLine();
+                    if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data()) && axis.model[i].x > 0) axis.model[i].x--;
+                    ImGui::SameLine();
+                    if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data()) && axis.model[i].x < 100) axis.model[i].x++;
+                    ImGui::SameLine();
+                    if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &axis.model[i].x, 0, 100));
+                    ImGui::SameLine();
+                    if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && axis.model[i].y > 0) axis.model[i].y--;
+                    ImGui::SameLine();
+                    if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && axis.model[i].y < 100) axis.model[i].y++;
+                    ImGui::SameLine();
+                    ImGui::SameLine();
+                    if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &axis.model[i].y, 0, 100));
+                }
+                ImGui::PopItemWidth();
+            }
+            ImGui::EndChild();
+            ImGui::SameLine();
+            if (ImGui::BeginChild(fmt::format("##{}SettingsWindow", label_default).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                if (ImGui::BeginMenuBar()) {
+                    ImGui::Text(fmt::format("{} Settings", ICON_FA_USER_COG).data());
+                    ImGui::EndMenuBar();
+                }
+                if (ImGui::InputText(fmt::format("Label##{}TextInput", label_default).data(), axis.label_input_buf, sizeof(axis.label_input_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    axis.label = axis.label_input_buf;
+                    memset(axis.label_input_buf, 0, sizeof(axis.label_input_buf));
+                }
+            }
+            ImGui::EndChild();
+            */
         }
         ImGui::EndChild();
     }
@@ -368,6 +441,7 @@ namespace sc::visor::gui {
                                         }
                                         ImGui::EndChild();
                                         ImGui::SameLine();
+                                        emit_axis_profile_slice(context, 0);
                                     }
                                     ImGui::EndChild();
                                     ImGui::EndTabItem();
@@ -452,14 +526,7 @@ namespace sc::visor::gui {
     }
 
     static void emit_content_panel() {
-        switch (current_view) {
-            case view::device_panel:
-                emit_content_device_panel();
-                break;
-            case view::notify_saved_panel:
-                emit_content_notify_saved_panel();
-                break;
-        }
+        emit_content_device_panel();
     }
 
     static void emit_primary_window_menu_bar() {
