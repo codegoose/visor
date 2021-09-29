@@ -95,11 +95,11 @@ namespace sc::visor::gui {
         return std::nullopt;
     }
 
-    void prepare_animation(const std::string_view &resource_name, animation_instance &instance) {
+    void prepare_animation(const std::string_view &resource_name, animation_instance &instance, const glm::ivec2 &size) {
         if (const auto content = sc::resource::get_resource("DATA", resource_name); content) {
             std::vector<std::byte> buffer(content->second);
             memcpy(buffer.data(), content->first, buffer.size());
-            if (const auto sequence = sc::texture::load_lottie_from_memory(resource_name, buffer, { 180, 180 }); sequence.has_value()) {
+            if (const auto sequence = sc::texture::load_lottie_from_memory(resource_name, buffer, size); sequence.has_value()) {
                 instance.frame_rate = sequence->frame_rate;
                 int frame_i = 0;
                 for (const auto &frame : sequence->frames) {
@@ -113,8 +113,8 @@ namespace sc::visor::gui {
     }
 
     void load_animations() {
-        prepare_animation("LOTTIE_CUBES", animation_scan);
-        prepare_animation("LOTTIE_DIGITAL_COMM", animation_comm);
+        prepare_animation("LOTTIE_LOADING", animation_scan, { 400, 400 });
+        prepare_animation("LOTTIE_COMMUNICATING", animation_comm, { 200, 200 });
     }
 
     static void scan_for_devices() {
