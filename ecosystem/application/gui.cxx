@@ -135,7 +135,6 @@ namespace sc::visor::gui {
         devices_future = async(std::launch::async, []() {
             return sc::firmware::mk4::discover(devices);
         });
-        spdlog::debug("Device scan started.");
     }
 
     static void poll_devices() {
