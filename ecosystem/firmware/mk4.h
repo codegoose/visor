@@ -16,7 +16,9 @@ namespace sc::firmware::mk4 {
 
             bool enabled;
             int8_t curve_i;
-            uint16_t min, max;
+            uint16_t min = 0, max = 65535;
+            uint16_t input = 0, output = 0;
+            float input_fraction = 0, output_fraction = 0;
         };
 
         const uint16_t vendor, product;
@@ -37,6 +39,8 @@ namespace sc::firmware::mk4 {
         tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> get_version();
         tl::expected<uint8_t, std::string> get_num_axes();
         tl::expected<axis_info, std::string> get_axis_state(const int &index);
+        std::optional<std::string> set_axis_enabled(const int &index, const bool &enabled);
+        std::optional<std::string> set_axis_range(const int &index, const uint16_t &min, const uint16_t &max);
     };
 
     tl::expected<std::vector<std::shared_ptr<device_handle>>, std::string> discover(const std::optional<std::vector<std::shared_ptr<device_handle>>> &existing = std::nullopt);

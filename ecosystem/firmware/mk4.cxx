@@ -19,7 +19,6 @@ sc::firmware::mk4::device_handle::device_handle(const uint16_t &vendor, const ui
 
 sc::firmware::mk4::device_handle::~device_handle() {
     hid_close(reinterpret_cast<hid_device *>(ptr));
-    spdlog::debug("Closed MK4 HID @ {} .", uuid);
 }
 
 tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string> sc::firmware::mk4::discover(const std::optional<std::vector<std::shared_ptr<device_handle>>> &existing) {
@@ -55,7 +54,7 @@ tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std
                     if (comm_res.has_value()) {
                         handles.push_back(new_device_handle);
                         spdlog::debug("Opened MK4 HID @ {} (Communications ID: {})", cur_dev->path, comm_res.value());
-                    } else spdlog::warn("Unable to validate MK4 HID @ {} ({})", cur_dev->path, comm_res.error());
+                    } // else spdlog::warn("Unable to validate MK4 HID @ {} ({})", cur_dev->path, comm_res.error());
                     new_device_handle->_communications_id = *comm_res;
                 }
             }
@@ -89,7 +88,6 @@ tl::expected<uint16_t, std::string> sc::firmware::mk4::device_handle::get_new_co
     buffer[2] = static_cast<std::byte>('!');
     auto rng = std::make_unique<Botan::AutoSeeded_RNG>();
     rng->randomize(reinterpret_cast<uint8_t *>(&buffer[3]), 55);
-    spdlog::debug(spdlog::to_hex(buffer));
     if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
     const auto start = std::chrono::system_clock::now();
     for (;;) {
@@ -191,6 +189,74 @@ tl::expected<sc::firmware::mk4::device_handle::axis_info, std::string> sc::firmw
         info.curve_i = static_cast<int8_t>(res.value()->data()[8]);
         memcpy(&info.min, &res.value()->data()[9], sizeof(info.min));
         memcpy(&info.max, &res.value()->data()[11], sizeof(info.max));
+        memcpy(&info.input, &res.value()->data()[13], sizeof(info.input));
+        memcpy(&info.output, &res.value()->data()[15], sizeof(info.output));
+        info.input_fraction = (double)(info.input - std::numeric_limits<uint16_t>::min()) / (double)(std::numeric_limits<uint16_t>::max() - std::numeric_limits<uint16_t>::min());
+        info.output_fraction = (double)(info.output - std::numeric_limits<uint16_t>::min()) / (double)(std::numeric_limits<uint16_t>::max() - std::numeric_limits<uint16_t>::min());
         return info;
+    }
+}
+
+std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_enabled(const int &index, const bool &enabled) {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
+    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    buffer[6] = static_cast<std::byte>('J');
+    buffer[7] = static_cast<std::byte>('A');
+    buffer[8] = static_cast<std::byte>('E');
+    buffer[9] = static_cast<std::byte>(index);
+    buffer[10] = static_cast<std::byte>(enabled);
+    if (const auto res = write(buffer); res) return *res;
+    const auto sent_packet_id = _next_packet_id++;
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for axis enablement acknowledgement from device.";
+        const auto res = read(2000);
+        if (!res.has_value()) return res.error();
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC", res.value()->data(), 2) != 0) continue;
+        uint16_t id, packet_id;
+        memcpy(&id, &res.value()->data()[2], sizeof(id));
+        memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
+        if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
+        if (res.value()->data()[7] != static_cast<std::byte>(enabled)) continue;
+        return std::nullopt;
+    }
+}
+
+std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(const int &index, const uint16_t &min, const uint16_t &max) {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
+    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    buffer[6] = static_cast<std::byte>('J');
+    buffer[7] = static_cast<std::byte>('A');
+    buffer[8] = static_cast<std::byte>('R');
+    buffer[9] = static_cast<std::byte>(index);
+    memcpy(&buffer[10], &min, sizeof(min));
+    memcpy(&buffer[12], &max, sizeof(max));
+    if (const auto res = write(buffer); res) return *res;
+    const auto sent_packet_id = _next_packet_id++;
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for axis range acknowledgement from device.";
+        const auto res = read(2000);
+        if (!res.has_value()) return res.error();
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC", res.value()->data(), 2) != 0) continue;
+        uint16_t id, packet_id;
+        memcpy(&id, &res.value()->data()[2], sizeof(id));
+        memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
+        if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
+        if (memcmp(&res.value()->data()[7], &min, sizeof(min)) != 0) continue;
+        if (memcmp(&res.value()->data()[9], &max, sizeof(max)) != 0) continue;
+        return std::nullopt;
     }
 }
