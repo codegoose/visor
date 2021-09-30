@@ -2,11 +2,14 @@
 
 #include <tl/expected.hpp>
 
+#include <atomic>
+#include <mutex>
 #include <cstddef>
 #include <array>
 #include <optional>
 #include <string>
 #include <memory>
+#include <limits>
 
 namespace sc::firmware::mk4 {
 
@@ -14,19 +17,20 @@ namespace sc::firmware::mk4 {
 
         struct axis_info {
 
-            bool enabled;
-            int8_t curve_i;
-            uint16_t min = 0, max = 65535;
+            bool enabled = false;
+            int8_t curve_i = -1;
+            uint16_t min = 0, max = std::numeric_limits<uint16_t>::max();
             uint16_t input = 0, output = 0;
             float input_fraction = 0, output_fraction = 0;
         };
 
+        std::mutex mutex;
         const uint16_t vendor, product;
         const std::string org, name, uuid, serial;
         void * const ptr;
 
         uint16_t _communications_id = 0;
-        uint16_t _next_packet_id = 0;
+        std::atomic_uint16_t _next_packet_id = 0;
 
         device_handle(const uint16_t &vendor, const uint16_t &product, const std::string_view &org, const std::string_view &name, const std::string_view &uuid, const std::string_view &serial, void * const ptr);
         device_handle(const device_handle&) = delete;

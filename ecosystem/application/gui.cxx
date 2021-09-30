@@ -70,13 +70,65 @@ namespace sc::visor::gui {
 
     struct device_context {
 
+        struct axis_info_ex {
+
+            int range_min = 0, range_max = std::numeric_limits<uint16_t>::max();
+            int deadzone_low = 0, deadzone_high = 0;
+
+            std::array<glm::ivec2, 6> model = {
+                glm::ivec2 { 0, 0 },
+                glm::ivec2 { 20, 20 },
+                glm::ivec2 { 40, 40 },
+                glm::ivec2 { 60, 60 },
+                glm::ivec2 { 80, 80 },
+                glm::ivec2 { 100, 100 }
+            };
+        };
+
+        std::mutex mutex;
         std::optional<std::chrono::high_resolution_clock::time_point> last_communication;
         std::shared_ptr<firmware::mk4::device_handle> handle;
-        int version_major, version_minor, version_revision;
+        std::atomic_int version_major, version_minor, version_revision;
         std::string name, serial;
-        std::optional<uint8_t> num_axes;
         std::vector<firmware::mk4::device_handle::axis_info> axes;
-        bool initials_communications_completed = false;
+        std::vector<axis_info_ex> axes_ex;
+        std::future<std::optional<std::string>> update_future;
+        std::atomic_bool initial_communication_complete = false;
+
+        std::optional<std::string> update() {
+            {
+                std::lock_guard guard(mutex);
+                const auto now = std::chrono::high_resolution_clock::now();
+                if (!last_communication) last_communication = now;
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *last_communication).count() < 2) return std::nullopt;
+            }
+            DEFER({
+                std::lock_guard guard(mutex);
+                last_communication = std::chrono::high_resolution_clock::now();
+            });
+            if (const auto res = handle->get_version(); res.has_value()) {
+                version_major = std::get<0>(*res);
+                version_minor = std::get<1>(*res);
+                version_revision = std::get<2>(*res);
+            } else return res.error();
+            const auto axes_res = handle->get_num_axes();
+            if (!axes_res.has_value()) return axes_res.error();
+            mutex.lock();
+            axes.resize(*axes_res);
+            axes_ex.resize(axes.size());
+            mutex.unlock();
+            for (int i = 0; i < *axes_res; i++) {
+                const auto res = handle->get_axis_state(i);
+                if (!res.has_value()) return res.error();
+                if (!initial_communication_complete) {
+                    axes_ex[i].range_min = res->min;
+                    axes_ex[i].range_max = res->max;
+                }
+                axes[i] = *res;
+            }
+            initial_communication_complete = true;
+            return std::nullopt;
+        }
     };
 
     static std::vector<std::shared_ptr<device_context>> device_contexts;
@@ -85,7 +137,11 @@ namespace sc::visor::gui {
         style.Colors[ImGuiCol_Tab] = { 50.f / 255.f, 50.f / 255.f, 50.f / 255.f, 1.f };
         style.Colors[ImGuiCol_TabActive] = { 70.f / 255.f, 70.f / 255.f, 70.f / 255.f, 1.f };
         style.Colors[ImGuiCol_TabHovered] = { 90.f / 255.f, 90.f / 255.f, 90.f / 255.f, 1.f };
-        style.Colors[ImGuiCol_WindowBg] = { 30.f / 255.f, 30.f / 255.f, 30.f / 255.f, 1.f };
+        style.Colors[ImGuiCol_WindowBg] = { 0x21 / 255.f, 0x25 / 255.f, 0x29 / 255.f, 1.f };
+        style.Colors[ImGuiCol_ChildBg] = { 50.f / 255.f, 50.f / 255.f, 50.f / 255.f, 1.f };
+        style.Colors[ImGuiCol_FrameBgActive] = { 70.f / 255.f, 70.f / 255.f, 70.f / 255.f, 1.f };
+        style.Colors[ImGuiCol_FrameBgHovered] = { 90.f / 255.f, 90.f / 255.f, 90.f / 255.f, 1.f };
+        style.Colors[ImGuiCol_FrameBg] = { 42.f / 255.f, 42.f / 255.f, 42.f / 255.f, 1.f };
     }
 
     static void prepare_styling_parameters(ImGuiStyle &style) {
@@ -130,8 +186,6 @@ namespace sc::visor::gui {
     }
 
     static void scan_for_devices() {
-        animation_scan.play = true;
-        animation_scan.loop = true;
         devices_future = async(std::launch::async, []() {
             return sc::firmware::mk4::discover(devices);
         });
@@ -141,10 +195,7 @@ namespace sc::visor::gui {
         if (devices_future.valid()) {
             if (devices_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
                 auto res = devices_future.get();
-                DEFER({
-                    devices_future = { };
-                    animation_scan.loop = false;
-                });
+                DEFER(devices_future = { });
                 if (!res.has_value()) {
                     spdlog::error(res.error());
                     return;
@@ -163,13 +214,13 @@ namespace sc::visor::gui {
             });
             if (contexts_i != device_contexts.end()) {
                 if (contexts_i->get()->handle.get() != device.get()) {
-                    spdlog::debug("Applying new handle to existing device context. (Serial: {})", device->serial);
+                    spdlog::debug("Applied new handle to device context: {}", device->serial);
                     contexts_i->get()->handle = device;
-                    contexts_i->get()->initials_communications_completed = false;
+                    contexts_i->get()->initial_communication_complete = false;
                 }
                 continue;
             }
-            spdlog::debug("Creating new device context. (Serial: {})", device->serial);
+            spdlog::debug("Created new device context: {}", device->serial);
             auto new_device_context = std::make_shared<device_context>();
             new_device_context->handle = device;
             new_device_context->name = device->name;
@@ -178,37 +229,21 @@ namespace sc::visor::gui {
         }
         for (auto &context : device_contexts) {
             if (!context->handle) continue;
-            const auto now = std::chrono::high_resolution_clock::now();
-            if (!context->last_communication) context->last_communication = now;
-            if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *context->last_communication).count() >= 2) {
-                context->last_communication = now;
-                if (const auto res = context->handle->get_version(); res) {
-                    context->version_major = std::get<0>(*res);
-                    context->version_minor = std::get<1>(*res);
-                    context->version_revision = std::get<2>(*res);
-                } else spdlog::error("Device context error: {}", res.error());
-                if (const auto res = context->handle->get_num_axes(); res) {
-                    context->num_axes = *res;
-                } else spdlog::error("Device context error: {}", res.error());
-                context->axes.clear();
-                for (int i = 0; i < *context->num_axes; i++) {
-                    const auto res = context->handle->get_axis_state(i);
-                    if (!res.has_value()) {
-                        spdlog::error("Device context error: {}", res.error());
-                        break;
-                    }
-                    context->axes.push_back(*res);
-                }
-                if (context->axes.size() == *context->num_axes) {
-                    context->initials_communications_completed = true;
-                    continue;
-                }
-                devices.erase(std::remove_if(devices.begin(), devices.end(), [&](const std::shared_ptr<firmware::mk4::device_handle> &device) {
-                    return device.get() == context->handle.get();
-                }), devices.end());
-                context->initials_communications_completed = false;
-                context->handle.reset();
+            if (context->update_future.valid()) {
+                if (context->update_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                    const auto err = context->update_future.get();
+                    if (!err.has_value()) continue;
+                    spdlog::error("Device context error: {}", *err);
+                    devices.erase(std::remove_if(devices.begin(), devices.end(), [&](const std::shared_ptr<firmware::mk4::device_handle> &device) {
+                        return device.get() == context->handle.get();
+                    }), devices.end());
+                    context->initial_communication_complete = false;
+                    context->handle.reset();
+                } else continue;
             }
+            context->update_future = async(std::launch::async, [context]() {
+                return context->update();
+            });
         }
     }
 
@@ -249,7 +284,8 @@ namespace sc::visor::gui {
             IM_COL32(255, 255, 255, 32),
             ImGui::GetStyle().FrameRounding
         );
-        ImGui::PushClipRect(bez_area_min, { bez_area_min.x + bez_area_size.x, bez_area_min.y + bez_area_size.y }, false);
+        // ImGui::PushClipRect(ImGui::GetWindowPos(), { ImGui::GetWindowPos().x + ImGui::GetWindowSize().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y }, true);
+        ImGui::PushClipRect(bez_area_min, { bez_area_min.x + bez_area_size.x, bez_area_min.y + bez_area_size.y }, true);
         bez_area_min.x += 12;
         bez_area_min.y += 12;
         bez_area_size.x -= 24;
@@ -266,6 +302,12 @@ namespace sc::visor::gui {
             last_plot = here;
         }
         draw_list->AddLine(last_plot, GLMD_IM2(coords_to_screen(inputs.back(), IM_GLMD2(bez_area_min), bez_area_size)), IM_COL32(255, 165, 0, 255), 2.f);
+        if (fraction.has_value()) {
+            const float forward = bez_area_size.x * *fraction;
+            draw_list->AddLine({ bez_area_min.x + forward, bez_area_min.y }, { bez_area_min.x + forward, bez_area_min.y + bez_area_size.y }, IM_COL32(255, 165, 0, 192), 2.f);
+            draw_list->AddCircleFilled({ bez_area_min.x + forward, bez_area_min.y }, 4.f, IM_COL32(255, 165, 0, 192));
+            draw_list->AddCircleFilled({ bez_area_min.x + forward, bez_area_min.y + bez_area_size.y }, 4.f, IM_COL32(255, 165, 0, 192));
+        }
         std::optional<int> hovering_point_i;
         for (int i = 0; i < inputs.size(); i++) {
             auto color = (i == 0 || i == inputs.size() - 1) ? IM_COL32(255, 165, 0, 255) : IM_COL32(255, 255, 255, 128);
@@ -304,24 +346,33 @@ namespace sc::visor::gui {
         const auto label_default = "Throttle";
         if (ImGui::BeginChild(fmt::format("##{}Window", label_default).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
             if (ImGui::BeginMenuBar()) {
-                ImGui::Text(fmt::format("{} {}", ICON_FA_CUBE, label_default).data());
+                ImGui::Text(fmt::format("{} {} Configurations", ICON_FA_COGS, label_default).data());
                 ImGui::EndMenuBar();
             }
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::ProgressBar(context->axes[axis_i].input_fraction);
-            ImGui::ProgressBar(context->axes[axis_i].output_fraction);
-            if (ImGui::Button(context->axes[axis_i].enabled ? "Disable this pedal." : "Enable this pedal.")) context->handle->set_axis_enabled(axis_i, !context->axes[axis_i].enabled);
+            if (ImGui::Button(context->axes[axis_i].enabled ? fmt::format("{} Disable", ICON_FA_PAUSE_CIRCLE).data() : fmt::format("{} Enable", ICON_FA_PLAY_CIRCLE).data(), { ImGui::GetContentRegionAvail().x, 0 })) context->handle->set_axis_enabled(axis_i, !context->axes[axis_i].enabled);
+            if (ImGui::Button(fmt::format("{} Retrieve Settings", ICON_FA_FILE_DOWNLOAD).data(), { ImGui::GetContentRegionAvail().x / 3, 0 }));
+            ImGui::SameLine();
+            if (ImGui::Button(fmt::format("{} Apply Settings", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
+                context->handle->set_axis_range(0, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max);
+            }
+            if (ImGui::BeginChild(fmt::format("##{}InputOutputWindow", label_default).data(), { 0, 86 }, true, ImGuiWindowFlags_MenuBar)) {
+                if (ImGui::BeginMenuBar()) {
+                    ImGui::Text(fmt::format("{} Input/Output", ICON_FA_CUBE).data());
+                    ImGui::EndMenuBar();
+                }
+                ImGui::ProgressBar(context->axes[axis_i].input_fraction, { ImGui::GetContentRegionAvail().x, 0 }, fmt::format("{}% in", static_cast<int>(glm::round(context->axes[axis_i].input_fraction * 100))).data());
+                ImGui::ProgressBar(context->axes[axis_i].output_fraction, { ImGui::GetContentRegionAvail().x, 0 }, fmt::format("{}% out", static_cast<int>(glm::round(context->axes[axis_i].output_fraction * 100))).data());
+            }
+            ImGui::EndChild();
             if (ImGui::BeginChild(fmt::format("##{}RangeWindow", label_default).data(), { 0, 120 }, true, ImGuiWindowFlags_MenuBar)) {
                 if (ImGui::BeginMenuBar()) {
                     ImGui::Text(fmt::format("{} Range", ICON_FA_RULER).data());
                     ImGui::EndMenuBar();
                 }
-                static int dz_top = 0, dz_bottom = 0;
-                ImGui::PushItemWidth(120);
-                ImGui::Text(fmt::format("Minimum Range: {}", context->axes[axis_i].min).data());
-                ImGui::Text(fmt::format("Maximum Range: {}", context->axes[axis_i].max).data());
-                ImGui::Text(fmt::format("Raw Input: {}", context->axes[axis_i].input).data());
-                ImGui::Text(fmt::format("Output: {}", context->axes[axis_i].output).data());
+                ImGui::ProgressBar(context->axes[axis_i].input_fraction, { ImGui::GetContentRegionAvail().x, 0 }, fmt::format("{}", context->axes[axis_i].input).data());
+                ImGui::PushItemWidth(160);
+                ImGui::SliderInt("Minimum", &context->axes_ex[axis_i].range_min, 0, glm::min(static_cast<int>(std::numeric_limits<uint16_t>::max()), context->axes_ex[axis_i].range_max));
+                ImGui::SliderInt("Maximum", &context->axes_ex[axis_i].range_max, glm::max(0, context->axes_ex[axis_i].range_min), std::numeric_limits<uint16_t>::max());
                 ImGui::PopItemWidth();
             }
             ImGui::EndChild();
@@ -330,15 +381,13 @@ namespace sc::visor::gui {
                     ImGui::Text(fmt::format("{} Deadzone", ICON_FA_ANCHOR).data());
                     ImGui::EndMenuBar();
                 }
-                static int dz_top = 0, dz_bottom = 0;
                 ImGui::PushItemWidth(160);
-                ImGui::SliderInt("Low Deadzone", &dz_bottom, 0, 15, "%d%%");
-                ImGui::SliderInt("High Deadzone", &dz_top, 0, 15, "%d%%");
+                ImGui::SliderInt("Low Deadzone", &context->axes_ex[axis_i].deadzone_low, 0, 35, "%d%%");
+                ImGui::SliderInt("High Deadzone", &context->axes_ex[axis_i].deadzone_high, 0, 35, "%d%%");
                 ImGui::PopItemWidth();
             }
             ImGui::EndChild();
-            /*
-            if (ImGui::BeginChild(fmt::format("##{}CurveWindow", label_default).data(), { 340, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+            if (ImGui::BeginChild(fmt::format("##{}CurveWindow", label_default).data(), { 0, 368 }, true, ImGuiWindowFlags_MenuBar)) {
                 if (ImGui::BeginMenuBar()) {
                     ImGui::Text(fmt::format("{} Curve", ICON_FA_BEZIER_CURVE).data());
                     ImGui::EndMenuBar();
@@ -355,46 +404,33 @@ namespace sc::visor::gui {
                 ImGui::Text("Curve Type");
                 {
                     std::vector<glm::dvec2> model;
-                    for (auto &percent : axis.model) model.push_back({
+                    for (auto &percent : context->axes_ex[axis_i].model) model.push_back({
                         static_cast<double>(percent.x) / 100.0,
                         static_cast<double>(percent.y) / 100.0
                     });
-                    cubic_bezier_plot(model, { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x });
+                    cubic_bezier_plot(model, { 200, 200 }, context->axes[axis_i].output_fraction);
                 }
                 ImGui::PushItemWidth(80);
-                for (int i = 0; i < axis.model.size(); i++) {
-                    if (i == 0 || i == axis.model.size() - 1) continue;
+                for (int i = 0; i < context->axes_ex[axis_i].model.size(); i++) {
+                    if (i == 0 || i == context->axes_ex[axis_i].model.size() - 1) continue;
                     ImGui::TextDisabled(fmt::format("#{}", i + 1).data());
                     ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data()) && axis.model[i].x > 0) axis.model[i].x--;
+                    if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data()) && context->axes_ex[axis_i].model[i].x > 0) context->axes_ex[axis_i].model[i].x--;
                     ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data()) && axis.model[i].x < 100) axis.model[i].x++;
+                    if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data()) && context->axes_ex[axis_i].model[i].x < 100) context->axes_ex[axis_i].model[i].x++;
                     ImGui::SameLine();
-                    if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &axis.model[i].x, 0, 100));
+                    if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &context->axes_ex[axis_i].model[i].x, 0, 100));
                     ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && axis.model[i].y > 0) axis.model[i].y--;
+                    if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && context->axes_ex[axis_i].model[i].y > 0) context->axes_ex[axis_i].model[i].y--;
                     ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && axis.model[i].y < 100) axis.model[i].y++;
+                    if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && context->axes_ex[axis_i].model[i].y < 100) context->axes_ex[axis_i].model[i].y++;
                     ImGui::SameLine();
                     ImGui::SameLine();
-                    if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &axis.model[i].y, 0, 100));
+                    if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &context->axes_ex[axis_i].model[i].y, 0, 100));
                 }
                 ImGui::PopItemWidth();
             }
             ImGui::EndChild();
-            ImGui::SameLine();
-            if (ImGui::BeginChild(fmt::format("##{}SettingsWindow", label_default).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                if (ImGui::BeginMenuBar()) {
-                    ImGui::Text(fmt::format("{} Settings", ICON_FA_USER_COG).data());
-                    ImGui::EndMenuBar();
-                }
-                if (ImGui::InputText(fmt::format("Label##{}TextInput", label_default).data(), axis.label_input_buf, sizeof(axis.label_input_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    axis.label = axis.label_input_buf;
-                    memset(axis.label_input_buf, 0, sizeof(axis.label_input_buf));
-                }
-            }
-            ImGui::EndChild();
-            */
         }
         ImGui::EndChild();
     }
@@ -406,43 +442,37 @@ namespace sc::visor::gui {
             hat
         };
         if (device_contexts.size()) {
-            animation_scan.time = 0;
             animation_scan.playing = false;
             if (ImGui::BeginTabBar("##DeviceTabBar")) {
                 for (const auto &context : device_contexts) {
+                    std::lock_guard guard(context->mutex);
                     if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, context->name, context->serial).data())) {
                         if (context->handle) ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
                         else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
-                        if (context->num_axes) {
-                            ImGui::SameLine();
-                            ImGui::TextDisabled(fmt::format("{} axes.", context->axes.size()).data());
-                        }
-                        if (context->initials_communications_completed) {
+                        if (context->initial_communication_complete) {
                             animation_comm.playing = false;
                             if (ImGui::BeginTabBar("##DeviceSpecificsTabBar")) {
                                 if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_COG).data())) {
                                     static std::optional<std::pair<selection_type, int>> current_selection;
-                                    if (ImGui::BeginChild("##DeviceMiscInformation", { 0, 0 }, true)) {
-                                        if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                                            if (ImGui::BeginMenuBar()) {
-                                                ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
-                                                ImGui::EndMenuBar();
-                                            }
-                                            if (context->num_axes) {
-                                                for (int i = 0; i < *context->num_axes; i++) {
-                                                    switch (i) {
-                                                        case 0: ImGui::Selectable("Throttle"); break;
-                                                        case 1: ImGui::Selectable("Brake"); break;
-                                                        case 2: ImGui::Selectable("Clutch"); break;
-                                                    }
+                                    if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                                        if (ImGui::BeginMenuBar()) {
+                                            ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
+                                            ImGui::EndMenuBar();
+                                        }
+                                        
+                                        if (const auto num_axes = context->axes.size(); num_axes) {
+                                            for (int i = 0; i < num_axes; i++) {
+                                                switch (i) {
+                                                    case 0: ImGui::Selectable("Throttle"); break;
+                                                    case 1: ImGui::Selectable("Brake"); break;
+                                                    case 2: ImGui::Selectable("Clutch"); break;
                                                 }
                                             }
                                         }
-                                        ImGui::EndChild();
-                                        ImGui::SameLine();
-                                        emit_axis_profile_slice(context, 0);
                                     }
                                     ImGui::EndChild();
+                                    ImGui::SameLine();
+                                    emit_axis_profile_slice(context, 0);
                                     ImGui::EndTabItem();
                                 }
                                 if (ImGui::BeginTabItem(fmt::format("{} Profile", ICON_FA_SLIDERS_H).data())) {
@@ -487,11 +517,9 @@ namespace sc::visor::gui {
                                 }
                                 ImGui::EndTabBar();
                             }
-                            ImGui::EndTabItem();
                         } else {
                             if (!animation_comm.playing) animation_comm.time = 164.0 / animation_comm.frame_rate;
                             animation_comm.playing = true;
-                            animation_comm.loop = true;
                             ImPenUtility pen;
                             pen.CalculateWindowBounds();
                             const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_comm.frames[animation_comm.frame_i]->size));
@@ -503,11 +531,13 @@ namespace sc::visor::gui {
                                 );
                             }
                         }
+                        ImGui::EndTabItem();
                     }
                 }
                 ImGui::EndTabBar();
             }
         } else {
+            animation_scan.play = true;
             ImPenUtility pen;
             pen.CalculateWindowBounds();
             const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
@@ -536,7 +566,7 @@ namespace sc::visor::gui {
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(fmt::format("{} Devices", ICON_FA_CUBES).data())) {
-                if (devices.size()) {
+                if (devices.size() || device_contexts.size()) {
                     for (auto &device : devices) ImGui::TextDisabled(fmt::format("{} {} {} (#{})", ICON_FA_MICROCHIP, device->org, device->name, device->serial).data());
                     ImGui::Selectable(fmt::format("{} Clear System Calibrations", ICON_FA_ERASER).data());
                     if (ImGui::Selectable(fmt::format("{} Release All", ICON_FA_STOP).data())) {
@@ -559,6 +589,8 @@ namespace sc::visor::gui {
 void sc::visor::gui::initialize() {
     prepare_styling();
     load_animations();
+    animation_scan.loop = true;
+    animation_comm.loop = true;
 }
 
 void sc::visor::gui::shutdown() {

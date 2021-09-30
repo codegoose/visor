@@ -22,6 +22,7 @@ sc::firmware::mk4::device_handle::~device_handle() {
 }
 
 tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string> sc::firmware::mk4::discover(const std::optional<std::vector<std::shared_ptr<device_handle>>> &existing) {
+    firmware::prepare_subsystem();
     const uint16_t vendor_id = 0x16C0, product_id = 0x0476;
     std::vector<std::shared_ptr<device_handle>> handles;
 	if (const auto devs = hid_enumerate(vendor_id, product_id); devs) {
@@ -65,6 +66,7 @@ tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std
 }
 
 std::optional<std::string> sc::firmware::mk4::device_handle::write(const std::array<std::byte, 64> &packet) {
+    std::lock_guard guard(mutex);
     std::vector<std::byte> buffer(packet.size() + 1);
     buffer[0] = static_cast<std::byte>(0x0);
     memcpy(&buffer[1], packet.data(), packet.size());
@@ -73,6 +75,7 @@ std::optional<std::string> sc::firmware::mk4::device_handle::write(const std::ar
 }
 
 tl::expected<std::optional<std::array<std::byte, 64>>, std::string> sc::firmware::mk4::device_handle::read(const std::optional<int> &timeout) {
+    std::lock_guard guard(mutex);
     std::array<std::byte, 64> buff_in;
     const auto num_bytes_read = hid_read_timeout(reinterpret_cast<hid_device *>(ptr), reinterpret_cast<unsigned char *>(buff_in.data()), buff_in.size(), timeout ? *timeout : 0);
     if (num_bytes_read == 0) return std::nullopt;
