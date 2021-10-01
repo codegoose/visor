@@ -263,3 +263,96 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
         return std::nullopt;
     }
 }
+
+std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_bezier_index(const int &index, const int8_t &bezier_index) {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
+    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    buffer[6] = static_cast<std::byte>('J');
+    buffer[7] = static_cast<std::byte>('A');
+    buffer[8] = static_cast<std::byte>('B');
+    buffer[9] = static_cast<std::byte>(index);
+    buffer[10] = static_cast<std::byte>(bezier_index);
+    if (const auto res = write(buffer); res) return *res;
+    const auto sent_packet_id = _next_packet_id++;
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for axis range acknowledgement from device.";
+        const auto res = read(2000);
+        if (!res.has_value()) return res.error();
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC", res.value()->data(), 2) != 0) continue;
+        uint16_t id, packet_id;
+        memcpy(&id, &res.value()->data()[2], sizeof(id));
+        memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
+        if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
+        if (res.value()->data()[7] != static_cast<std::byte>(bezier_index)) continue;
+        return std::nullopt;
+    }
+}
+
+std::optional<std::string> sc::firmware::mk4::device_handle::set_bezier_model(const int8_t &index, const std::array<glm::vec2, 6> &model) {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
+    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    buffer[6] = static_cast<std::byte>('B');
+    buffer[7] = static_cast<std::byte>('A');
+    buffer[8] = static_cast<std::byte>('M');
+    buffer[9] = static_cast<std::byte>(index);
+    memcpy(&buffer[10], model.data(), sizeof(glm::vec2) * model.size());
+    if (const auto res = write(buffer); res) return *res;
+    const auto sent_packet_id = _next_packet_id++;
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for bezier model acknowledgement from device.";
+        const auto res = read(2000);
+        if (!res.has_value()) return res.error();
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC", res.value()->data(), 2) != 0) continue;
+        uint16_t id, packet_id;
+        memcpy(&id, &res.value()->data()[2], sizeof(id));
+        memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
+        if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
+        if (memcmp(&res.value()->data()[7], model.data(), sizeof(glm::vec2) * model.size()) != 0) continue;
+        return std::nullopt;
+    }
+}
+
+tl::expected<std::array<glm::vec2, 6>, std::string> sc::firmware::mk4::device_handle::get_bezier_model(const int8_t &index) {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
+    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    buffer[6] = static_cast<std::byte>('B');
+    buffer[7] = static_cast<std::byte>('A');
+    buffer[8] = static_cast<std::byte>('G');
+    buffer[9] = static_cast<std::byte>(index);
+    if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
+    const auto sent_packet_id = _next_packet_id++;
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return tl::make_unexpected("Timed out waiting for bezier model acknowledgement from device.");
+        const auto res = read(2000);
+        if (!res.has_value()) return tl::make_unexpected(res.error());
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC", res.value()->data(), 2) != 0) continue;
+        uint16_t id, packet_id;
+        memcpy(&id, &res.value()->data()[2], sizeof(id));
+        memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
+        if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
+        std::array<glm::vec2, 6> model;
+        memcpy(model.data(), &res.value()->data()[7], sizeof(glm::vec2) * model.size());
+        return model;
+    }
+}
