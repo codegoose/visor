@@ -43,3 +43,11 @@ Adding this info to that file automatically is managed by a [**Python**](https:/
 ```
 python sync-intellisense.py
 ```
+
+## Debug in Visual Studio
+
+```
+&"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\devenv.exe" /debugexe .\bin\visor.exe
+```
+
+This will open Visual Studio and upon hitting the Start button it'll run the executable and break if there are any problems. I recommend to keep it open and run the program in there instead of writing ```.\bin\visor.exe```.
