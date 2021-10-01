@@ -1,4 +1,5 @@
 #include "gui.h"
+#include "animation_instance.h"
 
 #include <string_view>
 #include <array>
