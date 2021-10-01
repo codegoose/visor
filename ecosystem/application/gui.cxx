@@ -170,7 +170,8 @@ namespace sc::visor::gui {
         }
     }
 
-    static void cubic_bezier_plot(const std::vector<glm::dvec2> &inputs, const glm::ivec2 &size, std::optional<double> fraction = std::nullopt, std::optional<double> limit_min = std::nullopt, std::optional<double> limit_max = std::nullopt) {
+    static void cubic_bezier_plot(std::vector<glm::dvec2> inputs, const glm::ivec2 &size, std::optional<double> fraction = std::nullopt, std::optional<double> limit_min = std::nullopt, std::optional<double> limit_max = std::nullopt) {
+        if (limit_min) for (auto &p : inputs) p.y += *limit_min * (1.0 - p.y);
         auto draw_list = ImGui::GetWindowDrawList();
         auto bez_area_min = ImGui::GetCursorScreenPos();
         auto bez_area_size = size;
@@ -181,7 +182,6 @@ namespace sc::visor::gui {
             IM_COL32(255, 255, 255, 32),
             ImGui::GetStyle().FrameRounding
         );
-        // ImGui::PushClipRect(ImGui::GetWindowPos(), { ImGui::GetWindowPos().x + ImGui::GetWindowSize().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y }, true);
         ImGui::PushClipRect(bez_area_min, { bez_area_min.x + bez_area_size.x, bez_area_min.y + bez_area_size.y }, true);
         bez_area_min.x += 12;
         bez_area_min.y += 12;
@@ -195,15 +195,17 @@ namespace sc::visor::gui {
         for (int i = 1; i < num_curve_segments; i++) {
             const double power = (1.0 / static_cast<double>(num_curve_segments)) * static_cast<double>(i);
             const auto here = GLMD_IM2(coords_to_screen(bezier(inputs, power), IM_GLMD2(bez_area_min), bez_area_size));
+            draw_list->AddCircleFilled(last_plot, 1.f, IM_COL32(255, 165, 0, 255));
             draw_list->AddLine(last_plot, here, IM_COL32(255, 165, 0, 255), 2.f);
+            // draw_list->AddCircleFilled(here, 2.f, IM_COL32(255, 165, 0, 255));
             last_plot = here;
         }
         draw_list->AddLine(last_plot, GLMD_IM2(coords_to_screen(inputs.back(), IM_GLMD2(bez_area_min), bez_area_size)), IM_COL32(255, 165, 0, 255), 2.f);
         if (fraction.has_value()) {
-            const float forward = bez_area_size.x * *fraction;
-            draw_list->AddLine({ bez_area_min.x + forward, bez_area_min.y }, { bez_area_min.x + forward, bez_area_min.y + bez_area_size.y }, IM_COL32(255, 165, 0, 192), 2.f);
-            draw_list->AddCircleFilled({ bez_area_min.x + forward, bez_area_min.y }, 4.f, IM_COL32(255, 165, 0, 192));
-            draw_list->AddCircleFilled({ bez_area_min.x + forward, bez_area_min.y + bez_area_size.y }, 4.f, IM_COL32(255, 165, 0, 192));
+            const float height = bez_area_size.y * *fraction;
+            draw_list->AddLine({ bez_area_min.x, (bez_area_min.y + bez_area_size.y) - height }, { bez_area_min.x + bez_area_size.x, (bez_area_min.y + bez_area_size.y) - height }, IM_COL32(255, 165, 0, 192), 2.f);
+            // draw_list->AddCircleFilled({ bez_area_min.x + forward, bez_area_min.y }, 4.f, IM_COL32(255, 165, 0, 192));
+            // draw_list->AddCircleFilled({ bez_area_min.x + forward, bez_area_min.y + bez_area_size.y }, 4.f, IM_COL32(255, 165, 0, 192));
         }
         std::optional<int> hovering_point_i;
         for (int i = 0; i < inputs.size(); i++) {
@@ -217,17 +219,18 @@ namespace sc::visor::gui {
                 hovering_point_i = i;
             } else draw_list->AddRect(GLMD_IM2(screen_p[i] - 3.0), GLMD_IM2(screen_p[i] + 4.0), color, ImGui::GetStyle().FrameRounding, 0, 2);
         }
-        {
-            const auto top_left = GLMD_IM2(coords_to_screen({ 0, inputs.back().y }, IM_GLMD2(bez_area_min), bez_area_size));
-            const auto top_right = GLMD_IM2(coords_to_screen(inputs.back(), IM_GLMD2(bez_area_min), bez_area_size));
+        if (limit_max) {
+            const auto top_left = GLMD_IM2(coords_to_screen({ 0, *limit_max }, IM_GLMD2(bez_area_min), bez_area_size));
+            const auto top_right = GLMD_IM2(coords_to_screen({ 1, *limit_max }, IM_GLMD2(bez_area_min), bez_area_size));
             draw_list->AddLine(top_left, top_right, IM_COL32(255, 255, 255, 200), 2.f);
-            draw_list->AddText({ top_left.x, top_left.y + 2 }, IM_COL32(255, 255, 255, 128), fmt::format("{}%", static_cast<int>(inputs.back().y * 100.0)).data());
+            draw_list->AddText({ top_left.x, top_left.y + 2 }, IM_COL32(255, 255, 255, 128), fmt::format("{}%", static_cast<int>(glm::round(*limit_max * 100.0))).data());
         }
+        if (limit_min)
         {
-            const auto bottom_right = GLMD_IM2(coords_to_screen({ 1, inputs.front().y }, IM_GLMD2(bez_area_min), bez_area_size));
-            const auto bottom_left = GLMD_IM2(coords_to_screen(inputs.front(), IM_GLMD2(bez_area_min), bez_area_size));
+            const auto bottom_right = GLMD_IM2(coords_to_screen({ 1, *limit_min }, IM_GLMD2(bez_area_min), bez_area_size));
+            const auto bottom_left = GLMD_IM2(coords_to_screen({ 0, *limit_min }, IM_GLMD2(bez_area_min), bez_area_size));
             draw_list->AddLine(bottom_left, bottom_right, IM_COL32(255, 255, 255, 200), 2.f);
-            const auto text = fmt::format("{}%", static_cast<int>(inputs.front().y * 100.0));
+            const auto text = fmt::format("{}%", static_cast<int>(glm::round(*limit_min * 100.0)));
             const auto text_dim = ImGui::CalcTextSize(text.data());
             draw_list->AddText({ bottom_right.x - text_dim.x, bottom_right.y - text_dim.y - 2 }, IM_COL32(255, 255, 255, 128), text.data());
         }
@@ -250,38 +253,47 @@ namespace sc::visor::gui {
             if (ImGui::Button(fmt::format("{} Retrieve Settings", ICON_FA_FILE_DOWNLOAD).data(), { ImGui::GetContentRegionAvail().x / 3, 0 }));
             ImGui::SameLine();
             if (ImGui::Button(fmt::format("{} Apply Settings", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
-                context->handle->set_axis_range(0, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max);
+                context->handle->set_axis_range(0, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].limit);
             }
-            if (ImGui::BeginChild(fmt::format("##{}InputOutputWindow", label_default).data(), { 0, 86 }, true, ImGuiWindowFlags_MenuBar)) {
-                if (ImGui::BeginMenuBar()) {
-                    ImGui::Text(fmt::format("{} Input/Output", ICON_FA_CUBE).data());
-                    ImGui::EndMenuBar();
-                }
-                ImGui::ProgressBar(context->axes[axis_i].input_fraction, { ImGui::GetContentRegionAvail().x, 0 }, fmt::format("{}% in", static_cast<int>(glm::round(context->axes[axis_i].input_fraction * 100))).data());
-                ImGui::ProgressBar(context->axes[axis_i].output_fraction, { ImGui::GetContentRegionAvail().x, 0 }, fmt::format("{}% out", static_cast<int>(glm::round(context->axes[axis_i].output_fraction * 100))).data());
-            }
-            ImGui::EndChild();
-            if (ImGui::BeginChild(fmt::format("##{}RangeWindow", label_default).data(), { 0, 120 }, true, ImGuiWindowFlags_MenuBar)) {
+            if (ImGui::BeginChild("##{}InputRangeWindow", { 0, 140 }, true, ImGuiWindowFlags_MenuBar)) {
                 if (ImGui::BeginMenuBar()) {
                     ImGui::Text(fmt::format("{} Range", ICON_FA_RULER).data());
                     ImGui::EndMenuBar();
                 }
                 ImGui::ProgressBar(context->axes[axis_i].input_fraction, { ImGui::GetContentRegionAvail().x, 0 }, fmt::format("{}", context->axes[axis_i].input).data());
-                ImGui::PushItemWidth(160);
-                ImGui::SliderInt("Minimum", &context->axes_ex[axis_i].range_min, 0, glm::min(static_cast<int>(std::numeric_limits<uint16_t>::max()), context->axes_ex[axis_i].range_max));
-                ImGui::SliderInt("Maximum", &context->axes_ex[axis_i].range_max, glm::max(0, context->axes_ex[axis_i].range_min), std::numeric_limits<uint16_t>::max());
-                ImGui::PopItemWidth();
-            }
-            ImGui::EndChild();
-            if (ImGui::BeginChild(fmt::format("##{}DeadzoneWindow", label_default).data(), { 0, 86 }, true, ImGuiWindowFlags_MenuBar)) {
-                if (ImGui::BeginMenuBar()) {
-                    ImGui::Text(fmt::format("{} Deadzone", ICON_FA_ANCHOR).data());
-                    ImGui::EndMenuBar();
+                ImGui::SameLine();
+                ImGui::Text("Raw Input");
+                if (ImGui::Button(fmt::format(" {} ", ICON_FA_ANGLE_RIGHT).data())) context->axes_ex[axis_i].range_min = context->axes[axis_i].input;
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Set the minimum range to the current raw input value.");
+                    ImGui::EndTooltip();
                 }
-                ImGui::PushItemWidth(160);
-                ImGui::SliderInt("Low Deadzone", &context->axes_ex[axis_i].deadzone_low, 0, 35, "%d%%");
-                ImGui::SliderInt("High Deadzone", &context->axes_ex[axis_i].deadzone_high, 0, 35, "%d%%");
+                ImGui::SameLine();
+                ImGui::PushItemWidth(150);
+                ImGui::InputInt("Min", &context->axes_ex[axis_i].range_min);
+                ImGui::SameLine();
+                ImGui::InputInt("Max", &context->axes_ex[axis_i].range_max);
                 ImGui::PopItemWidth();
+                ImGui::SameLine();
+                if (ImGui::Button(fmt::format(" {} ", ICON_FA_ANGLE_LEFT).data())) context->axes_ex[axis_i].range_max = context->axes[axis_i].input;
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Set the maximum range to the current raw input value.");
+                    ImGui::EndTooltip();
+                }
+                ImGui::DragIntRange2("Min/Max", &context->axes_ex[axis_i].range_min, &context->axes_ex[axis_i].range_max);
+                ImGui::SliderInt("Output Limit##DZH", &context->axes_ex[axis_i].limit, 50, 100);
+                if (!context->axes[axis_i].enabled) ImGui::PushStyleColor(ImGuiCol_FrameBg, { 72.f / 255.f, 42.f / 255.f, 42.f / 255.f, 1.f });
+                ImGui::ProgressBar(context->axes[axis_i].output_fraction, { ImGui::GetContentRegionAvail().x, 0 });
+                if (!context->axes[axis_i].enabled) {
+                    ImGui::PopStyleColor();
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::BeginTooltip();
+                        ImGui::Text("This axis has been disabled.");
+                        ImGui::EndTooltip();
+                    }
+                }
             }
             ImGui::EndChild();
             if (ImGui::BeginChild(fmt::format("##{}CurveWindow", label_default).data(), { 0, 368 }, true, ImGuiWindowFlags_MenuBar)) {
@@ -305,27 +317,72 @@ namespace sc::visor::gui {
                         static_cast<double>(percent.x) / 100.0,
                         static_cast<double>(percent.y) / 100.0
                     });
-                    cubic_bezier_plot(model, { 200, 200 }, context->axes[axis_i].output_fraction);
+                    cubic_bezier_plot(model, { 200, 200 }, context->axes[axis_i].output_fraction, std::nullopt, context->axes_ex[axis_i].limit / 100.f);
                 }
-                ImGui::PushItemWidth(80);
-                for (int i = 0; i < context->axes_ex[axis_i].model.size(); i++) {
-                    if (i == 0 || i == context->axes_ex[axis_i].model.size() - 1) continue;
-                    ImGui::TextDisabled(fmt::format("#{}", i + 1).data());
-                    ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data()) && context->axes_ex[axis_i].model[i].x > 0) context->axes_ex[axis_i].model[i].x--;
-                    ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data()) && context->axes_ex[axis_i].model[i].x < 100) context->axes_ex[axis_i].model[i].x++;
-                    ImGui::SameLine();
-                    if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &context->axes_ex[axis_i].model[i].x, 0, 100));
-                    ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && context->axes_ex[axis_i].model[i].y > 0) context->axes_ex[axis_i].model[i].y--;
-                    ImGui::SameLine();
-                    if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && context->axes_ex[axis_i].model[i].y < 100) context->axes_ex[axis_i].model[i].y++;
-                    ImGui::SameLine();
-                    ImGui::SameLine();
-                    if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &context->axes_ex[axis_i].model[i].y, 0, 100));
+                ImGui::SameLine();
+                if (ImGui::BeginChild(fmt::format("##{}CurveWindowRightPanel", label_default).data(), { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y }, true)) {
+                    // static bool enable_axis_x = false;
+                    // ImGui::Checkbox(fmt::format("Use X-axis", ICON_FA_RULER_HORIZONTAL).data(), &enable_axis_x);
+                    // ImGui::Separator();
+                    ImGui::PushItemWidth(80);
+                    for (int i = 0; i < context->axes_ex[axis_i].model.size(); i++) {
+                        if (i == 0 || i == context->axes_ex[axis_i].model.size() - 1) continue;
+                        ImGui::TextDisabled(fmt::format("#{}", i + 1).data());
+                        ImGui::SameLine();
+                        /*
+                        if (enable_axis_x) {
+                            if (ImGui::Button(fmt::format("{}##XM{}", ICON_FA_MINUS, i + 1).data()) && context->axes_ex[axis_i].model[i].x > 0) context->axes_ex[axis_i].model[i].x--;
+                            ImGui::SameLine();
+                            if (ImGui::Button(fmt::format("{}##XP{}", ICON_FA_PLUS, i + 1).data()) && context->axes_ex[axis_i].model[i].x < 100) context->axes_ex[axis_i].model[i].x++;
+                            ImGui::SameLine();
+                            if (ImGui::SliderInt(fmt::format("X##{}", i + 1).data(), &context->axes_ex[axis_i].model[i].x, 0, 100));
+                            ImGui::SameLine();
+                        }
+                        */
+                        if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && context->axes_ex[axis_i].model[i].y > 0) context->axes_ex[axis_i].model[i].y--;
+                        ImGui::SameLine();
+                        if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && context->axes_ex[axis_i].model[i].y < 100) context->axes_ex[axis_i].model[i].y++;
+                        ImGui::SameLine();
+                        ImGui::SameLine();
+                        if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &context->axes_ex[axis_i].model[i].y, 0, 100));
+                    }
+                    ImGui::PopItemWidth();
                 }
-                ImGui::PopItemWidth();
+                ImGui::EndChild();
+                ImGui::Text(fmt::format("curve_i: {}", context->axes[axis_i].curve_i).data());
+                if (ImGui::Button("UP")) {
+                    if (const auto err = context->handle->set_bezier_model(0, {
+                        glm::vec2(0.f, 0.f),
+                        glm::vec2(.2f, 0.f),
+                        glm::vec2(.4f, 0.f),
+                        glm::vec2(.6f, 0.f),
+                        glm::vec2(.8f, 0.f),
+                        glm::vec2(1.f, 1.f)
+                    }); err) {
+                        spdlog::error(*err);
+                    } else spdlog::info("Processed bezier curve model.");
+                    if (const auto err = context->handle->set_axis_bezier_index(axis_i, 0); err) spdlog::error(*err);
+                    else spdlog::info("Processed bezier curve index.");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("++")) {
+                    if (const auto err = context->handle->set_axis_bezier_index(axis_i, 1); err) spdlog::error(*err);
+                    else spdlog::info("Processed bezier curve index.");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("GET")) {
+                    for (int i = 0; i < 4; i++) {
+                        const auto res = context->handle->get_bezier_model(i);
+                        if (!res.has_value()) {
+                            spdlog::error(res.error());
+                            continue;
+                        }
+                        spdlog::info("Processed bezier curve model.");
+                        for (auto &v : *res) {
+                            spdlog::info(":: {}, {}", v.x, v.y);
+                        }
+                    }
+                }
             }
             ImGui::EndChild();
         }
