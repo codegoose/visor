@@ -45,7 +45,7 @@ namespace sc::firmware::mk4 {
         tl::expected<uint8_t, std::string> get_num_axes();
         tl::expected<axis_info, std::string> get_axis_state(const int &index);
         std::optional<std::string> set_axis_enabled(const int &index, const bool &enabled);
-        std::optional<std::string> set_axis_range(const int &index, const uint16_t &min, const uint16_t &max);
+        std::optional<std::string> set_axis_range(const int &index, const uint16_t &min, const uint16_t &max, const uint8_t &upper_limit);
         std::optional<std::string> set_axis_bezier_index(const int &index, const int8_t &bezier_index);
         std::optional<std::string> set_bezier_model(const int8_t &index, const std::array<glm::vec2, 6> &model);
         tl::expected<std::array<glm::vec2, 6>, std::string> get_bezier_model(const int8_t &index);

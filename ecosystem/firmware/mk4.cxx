@@ -231,7 +231,7 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_enabled(co
     }
 }
 
-std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(const int &index, const uint16_t &min, const uint16_t &max) {
+std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(const int &index, const uint16_t &min, const uint16_t &max, const uint8_t &upper_limit) {
     std::array<std::byte, 64> buffer;
     memset(buffer.data(), 0, buffer.size());
     buffer[0] = static_cast<std::byte>('S');
@@ -244,6 +244,7 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
     buffer[9] = static_cast<std::byte>(index);
     memcpy(&buffer[10], &min, sizeof(min));
     memcpy(&buffer[12], &max, sizeof(max));
+    memcpy(&buffer[14], &upper_limit, sizeof(upper_limit));
     if (const auto res = write(buffer); res) return *res;
     const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
@@ -260,6 +261,7 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
         if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
         if (memcmp(&res.value()->data()[7], &min, sizeof(min)) != 0) continue;
         if (memcmp(&res.value()->data()[9], &max, sizeof(max)) != 0) continue;
+        if (memcmp(&res.value()->data()[11], &upper_limit, sizeof(upper_limit)) != 0) continue;
         return std::nullopt;
     }
 }
