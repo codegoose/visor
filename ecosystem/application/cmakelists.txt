@@ -5,6 +5,7 @@ add_executable(visor
     "gui.cxx"
     "version.cxx"
     "animation_instance.cxx"
+    "device_context.cxx"
 )
 
 target_link_libraries(visor
