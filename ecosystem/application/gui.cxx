@@ -1,4 +1,5 @@
 #include "gui.h"
+#include "application.h"
 #include "animation_instance.h"
 #include "device_context.h"
 
@@ -17,125 +18,18 @@
 #include <spdlog/spdlog.h>
 #include <pystring.h>
 
-#include "application.h"
-
 #include "../font/font_awesome_5.h"
 #include "../font/font_awesome_5_brands.h"
 #include "../imgui/imgui_utils.hpp"
 #include "../defer.hpp"
 #include "../resource/resource.h"
-#include "../texture/texture.h"
-#include "../file/file.h"
-#include "../firmware/mk4.h"
-
-#include <stb_image_write.h>
 
 namespace sc::visor::gui {
 
-    struct animation_instance {
-
-        bool play = false;
-        bool playing = false;
-        bool loop = false;
-        double time = 0;
-        double frame_rate = 0;
-        size_t frame_i = 0;
-        std::vector<std::shared_ptr<sc::texture::gpu_handle>> frames;
-        std::chrono::high_resolution_clock::time_point last_update = std::chrono::high_resolution_clock::now();
-
-        bool update() {
-            bool changed = false;
-            const auto now = std::chrono::high_resolution_clock::now();
-            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update);
-            last_update = now;
-            if (play && !playing) {
-                time = 0;
-                playing = true;
-                play = false;
-            }
-            if (playing) {
-                const double delta = static_cast<double>(elapsed.count()) / 1000.0;
-                time += delta;
-                if (const auto res = texture::frame_sequence::plot_frame_index(frame_rate, frames.size(), time, loop); res && frame_i != *res) {
-                    frame_i = *res;
-                    changed = true;
-                }
-                if (!loop && frame_i == frames.size() - 1) playing = false;
-            }
-            return changed;
-        }
-    };
-
     static animation_instance animation_scan, animation_comm;
-
     static std::optional<std::chrono::high_resolution_clock::time_point> devices_last_scan;
     static std::future<tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string>> devices_future;
     static std::vector<std::shared_ptr<firmware::mk4::device_handle>> devices;
-
-    struct device_context {
-
-        struct axis_info_ex {
-
-            int range_min = 0, range_max = std::numeric_limits<uint16_t>::max();
-            int deadzone_low = 0, deadzone_high = 0;
-
-            std::array<glm::ivec2, 6> model = {
-                glm::ivec2 { 0, 0 },
-                glm::ivec2 { 20, 20 },
-                glm::ivec2 { 40, 40 },
-                glm::ivec2 { 60, 60 },
-                glm::ivec2 { 80, 80 },
-                glm::ivec2 { 100, 100 }
-            };
-        };
-
-        std::mutex mutex;
-        std::optional<std::chrono::high_resolution_clock::time_point> last_communication;
-        std::shared_ptr<firmware::mk4::device_handle> handle;
-        std::atomic_int version_major, version_minor, version_revision;
-        std::string name, serial;
-        std::vector<firmware::mk4::device_handle::axis_info> axes;
-        std::vector<axis_info_ex> axes_ex;
-        std::future<std::optional<std::string>> update_future;
-        std::atomic_bool initial_communication_complete = false;
-
-        static std::optional<std::string> update(std::shared_ptr<device_context> context) {
-            if (!context || !context->handle) return std::nullopt;
-            {
-                std::lock_guard guard(context->mutex);
-                const auto now = std::chrono::high_resolution_clock::now();
-                if (!context->last_communication) context->last_communication = now;
-                if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *context->last_communication).count() < 2) return std::nullopt;
-            }
-            DEFER({
-                std::lock_guard guard(context->mutex);
-                context->last_communication = std::chrono::high_resolution_clock::now();
-            });
-            if (const auto res = context->handle->get_version(); res.has_value()) {
-                context->version_major = std::get<0>(*res);
-                context->version_minor = std::get<1>(*res);
-                context->version_revision = std::get<2>(*res);
-            } else return res.error();
-            const auto axes_res = context->handle->get_num_axes();
-            if (!axes_res.has_value()) return axes_res.error();
-            context->mutex.lock();
-            context->axes.resize(*axes_res);
-            context->axes_ex.resize(context->axes.size());
-            context->mutex.unlock();
-            for (int i = 0; i < *axes_res; i++) {
-                const auto res = context->handle->get_axis_state(i);
-                if (!res.has_value()) return res.error();
-                if (!context->initial_communication_complete) {
-                    context->axes_ex[i].range_min = res->min;
-                    context->axes_ex[i].range_max = res->max;
-                }
-                context->axes[i] = *res;
-            }
-            context->initial_communication_complete = true;
-            return std::nullopt;
-        }
-    };
-
     static std::vector<std::shared_ptr<device_context>> device_contexts;
 
     static void prepare_styling_colors(ImGuiStyle &style) {
@@ -190,12 +84,6 @@ namespace sc::visor::gui {
         prepare_animation("LOTTIE_COMMUNICATING", animation_comm, { 200, 200 });
     }
 
-    static void scan_for_devices() {
-        devices_future = async(std::launch::async, []() {
-            return sc::firmware::mk4::discover(devices);
-        });
-    }
-
     static void poll_devices() {
         if (devices_future.valid()) {
             if (devices_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
@@ -211,7 +99,11 @@ namespace sc::visor::gui {
             }
         } else {
             if (!devices_last_scan) devices_last_scan = std::chrono::high_resolution_clock::now();
-            if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - *devices_last_scan).count() >= 1) scan_for_devices();
+            if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - *devices_last_scan).count() >= 1) {
+                devices_future = async(std::launch::async, []() {
+                    return sc::firmware::mk4::discover(devices);
+                });
+            }
         }
         for (auto &device : devices) {
             const auto contexts_i = std::find_if(device_contexts.begin(), device_contexts.end(), [&device](const std::shared_ptr<device_context> &context) {
