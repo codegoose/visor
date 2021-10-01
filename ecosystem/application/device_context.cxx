@@ -2,6 +2,10 @@
 
 #include "../defer.hpp"
 
+#include <glm/common.hpp>
+#include <spdlog/spdlog.h>
+#include <spdlog/fmt/bin_to_hex.h>
+
 std::optional<std::string> sc::visor::device_context::update(std::shared_ptr<device_context> context) {
     if (!context || !context->handle) return std::nullopt;
     {
@@ -29,8 +33,21 @@ std::optional<std::string> sc::visor::device_context::update(std::shared_ptr<dev
         const auto res = context->handle->get_axis_state(i);
         if (!res.has_value()) return res.error();
         if (!context->initial_communication_complete) {
+            context->mutex.lock();
             context->axes_ex[i].range_min = res->min;
             context->axes_ex[i].range_max = res->max;
+            context->mutex.unlock();
+            if (res->curve_i > -1) {
+                const auto model_res = context->handle->get_bezier_model(res->curve_i);
+                if (!model_res.has_value()) return model_res.error();
+                context->mutex.lock();
+                for (int element_i = 0; element_i < context->axes_ex[i].model.size(); element_i++) {
+                    context->axes_ex[i].model[element_i].x = glm::round((model_res.value()[element_i].x * static_cast<float>(std::numeric_limits<uint16_t>::max())) / 655.35f);
+                    context->axes_ex[i].model[element_i].y = glm::round((model_res.value()[element_i].y * static_cast<float>(std::numeric_limits<uint16_t>::max())) / 655.35f);
+                    spdlog::info(":: {} -> {}, {}", element_i, context->axes_ex[i].model[element_i].x, context->axes_ex[i].model[element_i].y);
+                }
+                context->mutex.unlock();
+            }
         }
         context->axes[i] = *res;
     }

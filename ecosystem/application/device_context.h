@@ -19,7 +19,7 @@ namespace sc::visor {
         struct axis_info_ex {
 
             int range_min = 0, range_max = std::numeric_limits<uint16_t>::max();
-            int deadzone_low = 0, deadzone_high = 0;
+            int deadzone = 0, limit = 100;
 
             std::array<glm::ivec2, 6> model = {
                 glm::ivec2 { 0, 0 },
