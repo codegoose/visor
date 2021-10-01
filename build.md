@@ -26,7 +26,7 @@ Use ```RelWithDebInfo``` for release builds that implement Sentry.
 
 ```
 conan install .. -s build_type=RelWithDebInfo --build=missing
-...
+cmake ..
 cmake --build . --config RelWithDebInfo
 ```
 
