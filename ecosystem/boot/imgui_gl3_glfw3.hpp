@@ -86,7 +86,7 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-    const auto glfw_window = glfwCreateWindow(initial_framebuffer_size.x, initial_framebuffer_size.y, SC_APP_NAME, nullptr, nullptr);
+    const auto glfw_window = glfwCreateWindow(initial_framebuffer_size.x, initial_framebuffer_size.y, fmt::format("{} v{}", SC_APP_NAME, SC_APP_VER).data(), nullptr, nullptr);
     if (!glfw_window) return "Failed to create window.";
     DEFER({
         spdlog::debug("Destroying main window...");
