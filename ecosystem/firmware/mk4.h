@@ -50,6 +50,8 @@ namespace sc::firmware::mk4 {
         std::optional<std::string> set_axis_bezier_index(const int &index, const int8_t &bezier_index);
         std::optional<std::string> set_bezier_model(const int8_t &index, const std::array<glm::vec2, 6> &model);
         tl::expected<std::array<glm::vec2, 6>, std::string> get_bezier_model(const int8_t &index);
+        std::optional<std::string> set_bezier_label(const int8_t &index, const std::string_view &label);
+        tl::expected<std::array<char, 50>, std::string> get_bezier_label(const int8_t &index);
         std::optional<std::string> commit();
     };
 
