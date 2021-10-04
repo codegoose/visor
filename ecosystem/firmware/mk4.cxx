@@ -362,3 +362,29 @@ tl::expected<std::array<glm::vec2, 6>, std::string> sc::firmware::mk4::device_ha
         return model;
     }
 }
+
+std::optional<std::string> sc::firmware::mk4::device_handle::commit() {
+    std::array<std::byte, 64> buffer;
+    memset(buffer.data(), 0, buffer.size());
+    buffer[0] = static_cast<std::byte>('S');
+    buffer[1] = static_cast<std::byte>('C');
+    memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
+    buffer[6] = static_cast<std::byte>('S');
+    if (const auto res = write(buffer); res) return *res;
+    const auto start = std::chrono::system_clock::now();
+    for (;;) {
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for commit acknowledgement from device.";
+        const auto res = read(2000);
+        if (!res.has_value()) return res.error();
+        if (!res.value().has_value()) continue;
+        if (memcmp("SC", res.value()->data(), 2) != 0) continue;
+        uint16_t id, packet_id;
+        memcpy(&id, &res.value()->data()[2], sizeof(id));
+        memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
+        if (res.value()->data()[6] <= static_cast<std::byte>(0)) return "Chip was unable to write to EEPROM.";
+        return std::nullopt;
+    }
+}
