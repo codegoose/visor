@@ -194,6 +194,7 @@ tl::expected<sc::firmware::mk4::device_handle::axis_info, std::string> sc::firmw
         memcpy(&info.max, &res.value()->data()[11], sizeof(info.max));
         memcpy(&info.input, &res.value()->data()[13], sizeof(info.input));
         memcpy(&info.output, &res.value()->data()[15], sizeof(info.output));
+        memcpy(&info.limit, &res.value()->data()[17], sizeof(info.limit));
         info.input_fraction = (double)(info.input - std::numeric_limits<uint16_t>::min()) / (double)(std::numeric_limits<uint16_t>::max() - std::numeric_limits<uint16_t>::min());
         info.output_fraction = (double)(info.output - std::numeric_limits<uint16_t>::min()) / (double)(std::numeric_limits<uint16_t>::max() - std::numeric_limits<uint16_t>::min());
         return info;
