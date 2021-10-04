@@ -36,6 +36,7 @@ std::optional<std::string> sc::visor::device_context::update(std::shared_ptr<dev
             context->mutex.lock();
             context->axes_ex[i].range_min = res->min;
             context->axes_ex[i].range_max = res->max;
+            context->axes_ex[i].limit = res->limit;
             context->mutex.unlock();
             if (res->curve_i > -1) {
                 const auto model_res = context->handle->get_bezier_model(res->curve_i);
