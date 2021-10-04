@@ -8,6 +8,7 @@
 #include <spdlog/fmt/bin_to_hex.h>
 #include <pystring.h>
 #include <botan/auto_rng.h>
+#include <glm/common.hpp>
 
 #include <tuple>
 #include <algorithm>
