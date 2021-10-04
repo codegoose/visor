@@ -258,10 +258,7 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
         uint16_t id, packet_id;
         memcpy(&id, &res.value()->data()[2], sizeof(id));
         memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
-        if (id != _communications_id || packet_id != sent_packet_id) {
-            spdlog::warn("Ignoring invalid header.");
-            continue;
-        }
+        if (id != _communications_id || packet_id != sent_packet_id) continue;
         if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
         if (memcmp(&res.value()->data()[7], &min, sizeof(min)) != 0) continue;
         if (memcmp(&res.value()->data()[9], &max, sizeof(max)) != 0) continue;
