@@ -112,10 +112,10 @@ tl::expected<std::tuple<uint16_t, uint16_t, uint16_t>, std::string> sc::firmware
     buffer[0] = static_cast<std::byte>('S');
     buffer[1] = static_cast<std::byte>('C');
     memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
-    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
     buffer[6] = static_cast<std::byte>('V');
     if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
-    const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return tl::make_unexpected("Timed out waiting for communications ID from device.");
@@ -141,12 +141,12 @@ tl::expected<uint8_t, std::string> sc::firmware::mk4::device_handle::get_num_axe
     buffer[0] = static_cast<std::byte>('S');
     buffer[1] = static_cast<std::byte>('C');
     memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
-    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
     buffer[6] = static_cast<std::byte>('J');
     buffer[7] = static_cast<std::byte>('A');
     buffer[8] = static_cast<std::byte>('C');
     if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
-    const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return tl::make_unexpected("Timed out waiting for axis count from device.");
@@ -168,13 +168,13 @@ tl::expected<sc::firmware::mk4::device_handle::axis_info, std::string> sc::firmw
     buffer[0] = static_cast<std::byte>('S');
     buffer[1] = static_cast<std::byte>('C');
     memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
-    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
     buffer[6] = static_cast<std::byte>('J');
     buffer[7] = static_cast<std::byte>('A');
     buffer[8] = static_cast<std::byte>('S');
     buffer[9] = static_cast<std::byte>(index);
     if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
-    const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return tl::make_unexpected("Timed out waiting for axis count from device.");
@@ -206,14 +206,14 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_enabled(co
     buffer[0] = static_cast<std::byte>('S');
     buffer[1] = static_cast<std::byte>('C');
     memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
-    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
     buffer[6] = static_cast<std::byte>('J');
     buffer[7] = static_cast<std::byte>('A');
     buffer[8] = static_cast<std::byte>('E');
     buffer[9] = static_cast<std::byte>(index);
     buffer[10] = static_cast<std::byte>(enabled);
     if (const auto res = write(buffer); res) return *res;
-    const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for axis enablement acknowledgement from device.";
@@ -237,7 +237,8 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
     buffer[0] = static_cast<std::byte>('S');
     buffer[1] = static_cast<std::byte>('C');
     memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
-    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
     buffer[6] = static_cast<std::byte>('J');
     buffer[7] = static_cast<std::byte>('A');
     buffer[8] = static_cast<std::byte>('R');
@@ -246,7 +247,6 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
     memcpy(&buffer[12], &max, sizeof(max));
     memcpy(&buffer[14], &upper_limit, sizeof(upper_limit));
     if (const auto res = write(buffer); res) return *res;
-    const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for axis range acknowledgement from device.";
@@ -257,7 +257,10 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
         uint16_t id, packet_id;
         memcpy(&id, &res.value()->data()[2], sizeof(id));
         memcpy(&packet_id, &res.value()->data()[4], sizeof(packet_id));
-        if (id != _communications_id || packet_id != sent_packet_id) continue;
+        if (id != _communications_id || packet_id != sent_packet_id) {
+            spdlog::warn("Ignoring invalid header.");
+            continue;
+        }
         if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
         if (memcmp(&res.value()->data()[7], &min, sizeof(min)) != 0) continue;
         if (memcmp(&res.value()->data()[9], &max, sizeof(max)) != 0) continue;
@@ -272,14 +275,14 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_bezier_ind
     buffer[0] = static_cast<std::byte>('S');
     buffer[1] = static_cast<std::byte>('C');
     memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
-    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
     buffer[6] = static_cast<std::byte>('J');
     buffer[7] = static_cast<std::byte>('A');
     buffer[8] = static_cast<std::byte>('B');
     buffer[9] = static_cast<std::byte>(index);
     buffer[10] = static_cast<std::byte>(bezier_index);
     if (const auto res = write(buffer); res) return *res;
-    const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for axis range acknowledgement from device.";
@@ -303,14 +306,14 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_bezier_model(co
     buffer[0] = static_cast<std::byte>('S');
     buffer[1] = static_cast<std::byte>('C');
     memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
-    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
     buffer[6] = static_cast<std::byte>('B');
     buffer[7] = static_cast<std::byte>('A');
     buffer[8] = static_cast<std::byte>('M');
     buffer[9] = static_cast<std::byte>(index);
     memcpy(&buffer[10], model.data(), sizeof(glm::vec2) * model.size());
     if (const auto res = write(buffer); res) return *res;
-    const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return "Timed out waiting for bezier model acknowledgement from device.";
@@ -334,13 +337,13 @@ tl::expected<std::array<glm::vec2, 6>, std::string> sc::firmware::mk4::device_ha
     buffer[0] = static_cast<std::byte>('S');
     buffer[1] = static_cast<std::byte>('C');
     memcpy(&buffer[2], &_communications_id, sizeof(_communications_id));
-    memcpy(&buffer[4], &_next_packet_id, sizeof(_next_packet_id));
+    const auto sent_packet_id = _next_packet_id++;
+    memcpy(&buffer[4], &sent_packet_id, sizeof(sent_packet_id));
     buffer[6] = static_cast<std::byte>('B');
     buffer[7] = static_cast<std::byte>('A');
     buffer[8] = static_cast<std::byte>('G');
     buffer[9] = static_cast<std::byte>(index);
     if (const auto res = write(buffer); res) return tl::make_unexpected(*res);
-    const auto sent_packet_id = _next_packet_id++;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() > 2000) return tl::make_unexpected("Timed out waiting for bezier model acknowledgement from device.");
