@@ -32,7 +32,7 @@ namespace sc::firmware::mk4 {
         void * const ptr;
 
         uint16_t _communications_id = 0;
-        std::atomic_uint16_t _next_packet_id = 0;
+        uint16_t _next_packet_id = 0;
 
         device_handle(const uint16_t &vendor, const uint16_t &product, const std::string_view &org, const std::string_view &name, const std::string_view &uuid, const std::string_view &serial, void * const ptr);
         device_handle(const device_handle&) = delete;
