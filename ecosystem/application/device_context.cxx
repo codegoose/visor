@@ -12,7 +12,7 @@ std::optional<std::string> sc::visor::device_context::update(std::shared_ptr<dev
     {
         const auto now = std::chrono::high_resolution_clock::now();
         if (!context->last_communication) context->last_communication = now;
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *context->last_communication).count() < 2) return std::nullopt;
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *context->last_communication).count() < 10) return std::nullopt;
     }
     DEFER(context->last_communication = std::chrono::high_resolution_clock::now(););
     if (const auto res = context->handle->get_version(); res.has_value()) {
