@@ -7,9 +7,9 @@
 #define SC_FEATURE_RENDER_ON_RESIZE
 
 #define SC_VIEW_INIT_W 672
-#define SC_VIEW_INIT_H 800
-#define SC_VIEW_MIN_W 500
-#define SC_VIEW_MIN_H 400
+#define SC_VIEW_INIT_H 636
+#define SC_VIEW_MIN_W 672
+#define SC_VIEW_MIN_H 636
 
 #include "../boot/imgui_gl3_glfw3.hpp"
 
