@@ -244,7 +244,7 @@ namespace sc::visor::gui {
     }
 
     static void emit_axis_profile_slice(const std::shared_ptr<device_context> &context, int axis_i) {
-        const auto label_default = "Throttle";
+        const auto label_default = axis_i == 0 ? "Throttle" : (axis_i == 1 ? "Brake" : "Clutch");
         if (ImGui::BeginChild(fmt::format("##{}Window", label_default).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
             if (ImGui::BeginMenuBar()) {
                 ImGui::Text(fmt::format("{} {} Configurations", ICON_FA_COGS, label_default).data());
@@ -301,86 +301,92 @@ namespace sc::visor::gui {
                     }
                 }
                 if (update_axis_range) {
-                    const auto err = context->handle->set_axis_range(0, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].limit);
+                    const auto err = context->handle->set_axis_range(axis_i, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].limit);
                     if (err) spdlog::error(*err);
+                    else spdlog::info("Updated axis #{} range: {}, {}, {}", axis_i, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].limit);
                 }
             }
             ImGui::EndChild();
-            if (ImGui::BeginChild(fmt::format("##{}CurveWindow", label_default).data(), { 0, 368 }, true, ImGuiWindowFlags_MenuBar)) {
+            if (ImGui::BeginChild(fmt::format("##{}CurveWindow", label_default).data(), { 0, 294 }, true, ImGuiWindowFlags_MenuBar)) {
                 if (ImGui::BeginMenuBar()) {
                     ImGui::Text(fmt::format("{} Curve", ICON_FA_BEZIER_CURVE).data());
                     ImGui::EndMenuBar();
                 }
-                if (ImGui::BeginCombo(fmt::format("##{}CurveOptions", label_default).data(), "Linear")) {
-                    ImGui::Selectable("Option 1");
-                    ImGui::Selectable("Option 2");
-                    ImGui::Selectable("Option 3");
-                    ImGui::Selectable("Option 4");
-                    ImGui::Selectable("Option 5");
+                const std::string selected_model_label = context->axes_ex[axis_i].model_edit_i >= 0 ? (context->models[context->axes_ex[axis_i].model_edit_i].label ? fmt::format("{} (#{})", *context->models[context->axes_ex[axis_i].model_edit_i].label, context->axes_ex[axis_i].model_edit_i) : fmt::format("Model #{}", context->axes_ex[axis_i].model_edit_i)) : "None selected.";
+                if (ImGui::BeginCombo(fmt::format("##{}CurveOptions", label_default).data(), selected_model_label.data())) {
+                    for (int model_i = 0; model_i < context->models.size(); model_i++) {
+                        std::string this_label = context->models[model_i].label ? fmt::format("{} (#{})", *context->models[model_i].label, model_i) : fmt::format("Model #{}", model_i);
+                        if (model_i == context->axes[axis_i].curve_i) this_label += " *";
+                        if (ImGui::Selectable(this_label.data())) context->axes_ex[axis_i].model_edit_i = model_i;
+                    }
                     ImGui::EndCombo();
                 }
                 ImGui::SameLine();
-                ImGui::Text("Curve Type");
-                {
-                    std::vector<glm::dvec2> model;
-                    for (auto &percent : context->axes_ex[axis_i].model) model.push_back({
-                        static_cast<double>(percent.x) / 100.0,
-                        static_cast<double>(percent.y) / 100.0
-                    });
-                    float cif = static_cast<double>(context->axes[axis_i].input - context->axes[axis_i].min) / static_cast<double>(context->axes[axis_i].max - context->axes[axis_i].min);
-                    if (cif > 1.0f) cif = 1.0f;
-                    cubic_bezier_plot(model, { 200, 200 }, context->axes[axis_i].output_fraction, std::nullopt, context->axes_ex[axis_i].limit / 100.f, cif);
-                }
-                ImGui::SameLine();
-                if (ImGui::BeginChild(fmt::format("##{}CurveWindowRightPanel", label_default).data(), { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y }, true)) {
-                    ImGui::PushItemWidth(80);
-                    for (int i = 0; i < context->axes_ex[axis_i].model.size(); i++) {
-                        if (i == 0 || i == context->axes_ex[axis_i].model.size() - 1) continue;
-                        ImGui::TextDisabled(fmt::format("#{}", i + 1).data());
-                        ImGui::SameLine();
-                        if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && context->axes_ex[axis_i].model[i].y > 0) context->axes_ex[axis_i].model[i].y--;
-                        ImGui::SameLine();
-                        if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && context->axes_ex[axis_i].model[i].y < 100) context->axes_ex[axis_i].model[i].y++;
-                        ImGui::SameLine();
-                        ImGui::SameLine();
-                        if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &context->axes_ex[axis_i].model[i].y, 0, 100));
+                ImGui::Text("Curve Model");
+                if (context->axes_ex[axis_i].model_edit_i >= 0) {
+                    ImGui::InputText("", context->models[context->axes_ex[axis_i].model_edit_i].label_buffer.data(), context->models[context->axes_ex[axis_i].model_edit_i].label_buffer.size());
+                    ImGui::SameLine();
+                    if (ImGui::Button("Set Label", { ImGui::GetContentRegionAvail().x, 0 })) {
+                        const auto err = context->handle->set_bezier_label(context->axes_ex[axis_i].model_edit_i, context->models[context->axes_ex[axis_i].model_edit_i].label_buffer.data());
+                        if (err) spdlog::error(*err);
+                        else context->models[context->axes_ex[axis_i].model_edit_i].label = context->models[context->axes_ex[axis_i].model_edit_i].label_buffer.data();
                     }
-                    ImGui::PopItemWidth();
-                }
-                ImGui::EndChild();
-                ImGui::Text(fmt::format("curve_i: {}", context->axes[axis_i].curve_i).data());
-                if (ImGui::Button("UP")) {
-                    if (const auto err = context->handle->set_bezier_model(0, {
-                        glm::vec2(0.f, 0.f),
-                        glm::vec2(.2f, 0.f),
-                        glm::vec2(.4f, 0.f),
-                        glm::vec2(.6f, 0.f),
-                        glm::vec2(.8f, 0.f),
-                        glm::vec2(1.f, 1.f)
-                    }); err) {
-                        spdlog::error(*err);
-                    } else spdlog::info("Processed bezier curve model.");
-                    if (const auto err = context->handle->set_axis_bezier_index(axis_i, 0); err) spdlog::error(*err);
-                    else spdlog::info("Processed bezier curve index.");
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("++")) {
-                    if (const auto err = context->handle->set_axis_bezier_index(axis_i, 1); err) spdlog::error(*err);
-                    else spdlog::info("Processed bezier curve index.");
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("GET")) {
-                    for (int i = 0; i < 4; i++) {
-                        const auto res = context->handle->get_bezier_model(i);
-                        if (!res.has_value()) {
-                            spdlog::error(res.error());
-                            continue;
+                    {
+                        std::vector<glm::dvec2> model;
+                        for (auto &percent : context->models[context->axes_ex[axis_i].model_edit_i].points) model.push_back({
+                            static_cast<double>(percent.x) / 100.0,
+                            static_cast<double>(percent.y) / 100.0
+                        });
+                        float cif = static_cast<double>(context->axes[axis_i].input - context->axes[axis_i].min) / static_cast<double>(context->axes[axis_i].max - context->axes[axis_i].min);
+                        if (cif > 1.0f) cif = 1.0f;
+                        if (context->axes_ex[axis_i].model_edit_i == context->axes[axis_i].curve_i) cubic_bezier_plot(model, { 200, 200 }, context->axes[axis_i].output_fraction, std::nullopt, context->axes_ex[axis_i].limit / 100.f, cif);
+                        else cubic_bezier_plot(model, { 200, 200 }, std::nullopt, std::nullopt, context->axes_ex[axis_i].limit / 100.f, cif);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::BeginChild(fmt::format("##{}CurveWindowRightPanel", label_default).data(), { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y }, false)) {
+                        bool update_model = false;
+                        ImGui::PushItemWidth(80);
+                        for (int i = 0; i < context->models[context->axes_ex[axis_i].model_edit_i].points.size(); i++) {
+                            if (i == 0 || i == context->models[context->axes_ex[axis_i].model_edit_i].points.size() - 1) continue;
+                            switch (i) {
+                                case 1: ImGui::TextDisabled("20%%"); break;
+                                case 2: ImGui::TextDisabled("40%%"); break;
+                                case 3: ImGui::TextDisabled("60%%"); break;
+                                case 4: ImGui::TextDisabled("80%%"); break;
+                                default: break;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && context->models[context->axes_ex[axis_i].model_edit_i].points[i].y > 0) {
+                                context->models[context->axes_ex[axis_i].model_edit_i].points[i].y--;
+                                update_model = true;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && context->models[context->axes_ex[axis_i].model_edit_i].points[i].y < 100) {
+                                context->models[context->axes_ex[axis_i].model_edit_i].points[i].y++;
+                                update_model = true;
+                            }
+                            ImGui::SameLine();
+                            ImGui::SameLine();
+                            if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &context->models[context->axes_ex[axis_i].model_edit_i].points[i].y, 0, 100)) update_model = true;
                         }
-                        spdlog::info("Processed bezier curve model.");
-                        for (auto &v : *res) {
-                            spdlog::info(":: {}, {}", v.x, v.y);
+                        ImGui::PopItemWidth();
+                        if (update_model) {
+                            std::array<glm::vec2, 6> model;
+                            for (int i = 0; i < context->models[context->axes_ex[axis_i].model_edit_i].points.size(); i++) model[i] = {
+                                static_cast<float>(context->models[context->axes_ex[axis_i].model_edit_i].points[i].x) / 100.f,
+                                static_cast<float>(context->models[context->axes_ex[axis_i].model_edit_i].points[i].y) / 100.f
+                            };
+                            const auto err = context->handle->set_bezier_model(context->axes_ex[axis_i].model_edit_i, model);
+                            if (err) spdlog::warn(*err);
+                            else spdlog::info("Model updated.");
+                        }
+                        if (context->axes[axis_i].curve_i != context->axes_ex[axis_i].model_edit_i && ImGui::Button("Make Active", { ImGui::GetContentRegionAvail().x, 0 })) {
+                            const auto err = context->handle->set_axis_bezier_index(axis_i, context->axes_ex[axis_i].model_edit_i);
+                            if (err) spdlog::warn(*err);
+                            else spdlog::info("Axis model index updated.");
                         }
                     }
+                    ImGui::EndChild();
                 }
             }
             ImGui::EndChild();
@@ -404,26 +410,25 @@ namespace sc::visor::gui {
                         else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
                         if (context->initial_communication_complete) {
                             animation_comm.playing = false;
-                            static std::optional<std::pair<selection_type, int>> current_selection;
+                            static int current_selection;
                             if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                                 if (ImGui::BeginMenuBar()) {
                                     ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
                                     ImGui::EndMenuBar();
                                 }
-                                
                                 if (const auto num_axes = context->axes.size(); num_axes) {
                                     for (int i = 0; i < num_axes; i++) {
                                         switch (i) {
-                                            case 0: ImGui::Selectable("Throttle"); break;
-                                            case 1: ImGui::Selectable("Brake"); break;
-                                            case 2: ImGui::Selectable("Clutch"); break;
+                                            case 0: if (ImGui::Selectable("Throttle", current_selection == 0)) current_selection = 0; break;
+                                            case 1: if (ImGui::Selectable("Brake", current_selection == 1)) current_selection = 1; break;
+                                            case 2: if (ImGui::Selectable("Clutch", current_selection == 2)) current_selection = 2; break;
                                         }
                                     }
                                 }
                             }
                             ImGui::EndChild();
                             ImGui::SameLine();
-                            emit_axis_profile_slice(context, 0);
+                            emit_axis_profile_slice(context, current_selection);
                         } else {
                             if (!animation_comm.playing) animation_comm.time = 164.0 / animation_comm.frame_rate;
                             animation_comm.playing = true;

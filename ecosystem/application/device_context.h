@@ -20,8 +20,12 @@ namespace sc::visor {
 
             int range_min = 0, range_max = std::numeric_limits<uint16_t>::max();
             int deadzone = 0, limit = 100;
+            int model_edit_i = -1;
+        };
 
-            std::array<glm::ivec2, 6> model = {
+        struct model {
+
+            std::array<glm::ivec2, 6> points = {
                 glm::ivec2 { 0, 0 },
                 glm::ivec2 { 20, 20 },
                 glm::ivec2 { 40, 40 },
@@ -29,7 +33,12 @@ namespace sc::visor {
                 glm::ivec2 { 80, 80 },
                 glm::ivec2 { 100, 100 }
             };
+
+            std::optional<std::string> label;
+            std::array<char, 50> label_buffer = { 0 };
         };
+
+        std::array<model, 10> models;
 
         std::mutex mutex;
         std::optional<std::chrono::high_resolution_clock::time_point> last_communication;

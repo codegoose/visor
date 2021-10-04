@@ -22,28 +22,35 @@ std::optional<std::string> sc::visor::device_context::update(std::shared_ptr<dev
     } else return res.error();
     const auto axes_res = context->handle->get_num_axes();
     if (!axes_res.has_value()) return axes_res.error();
-    context->mutex.lock();
     context->axes.resize(*axes_res);
     context->axes_ex.resize(context->axes.size());
-    context->mutex.unlock();
-    for (int i = 0; i < *axes_res; i++) {
-        const auto res = context->handle->get_axis_state(i);
+    for (int axis_i = 0; axis_i < *axes_res; axis_i++) {
+        const auto res = context->handle->get_axis_state(axis_i);
         if (!res.has_value()) return res.error();
         if (!context->initial_communication_complete) {
-            context->axes_ex[i].range_min = res->min;
-            context->axes_ex[i].range_max = res->max;
-            context->axes_ex[i].limit = res->limit;
-            if (res->curve_i > -1) {
-                const auto model_res = context->handle->get_bezier_model(res->curve_i);
-                if (!model_res.has_value()) return model_res.error();
-                for (int element_i = 0; element_i < context->axes_ex[i].model.size(); element_i++) {
-                    context->axes_ex[i].model[element_i].x = glm::round((model_res.value()[element_i].x * static_cast<float>(std::numeric_limits<uint16_t>::max())) / 655.35f);
-                    context->axes_ex[i].model[element_i].y = glm::round((model_res.value()[element_i].y * static_cast<float>(std::numeric_limits<uint16_t>::max())) / 655.35f);
-                    spdlog::info(":: {} -> {}, {}", element_i, context->axes_ex[i].model[element_i].x, context->axes_ex[i].model[element_i].y);
-                }
+            context->axes_ex[axis_i].range_min = res->min;
+            context->axes_ex[axis_i].range_max = res->max;
+            context->axes_ex[axis_i].limit = res->limit;
+            context->axes_ex[axis_i].model_edit_i = res->curve_i;
+        }
+        context->axes[axis_i] = *res;
+    }
+    if (!context->initial_communication_complete) {
+        for (int model_i = 0; model_i < context->models.size(); model_i++) {
+            const auto label_res = context->handle->get_bezier_label(model_i);
+            if (!label_res.has_value()) return label_res.error();
+            if (strnlen_s(label_res->data(), 50) > 0) {
+                context->models[model_i].label = label_res->data();
+                memcpy(context->models[model_i].label_buffer.data(), label_res->data(), label_res->size());
+            }
+            const auto model_res = context->handle->get_bezier_model(model_i);
+            if (!model_res.has_value()) return model_res.error();
+            for (int element_i = 0; element_i < context->models[model_i].points.size(); element_i++) {
+                context->models[model_i].points[element_i].x = glm::round((model_res.value()[element_i].x * static_cast<float>(std::numeric_limits<uint16_t>::max())) / 655.35f);
+                context->models[model_i].points[element_i].y = glm::round((model_res.value()[element_i].y * static_cast<float>(std::numeric_limits<uint16_t>::max())) / 655.35f);
+                spdlog::debug("Curve Info: model #{}, point #{}: {}, {}", model_i, element_i, context->models[model_i].points[element_i].x, context->models[model_i].points[element_i].y);
             }
         }
-        context->axes[i] = *res;
     }
     context->initial_communication_complete = true;
     return std::nullopt;
