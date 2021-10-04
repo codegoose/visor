@@ -8,16 +8,13 @@
 
 std::optional<std::string> sc::visor::device_context::update(std::shared_ptr<device_context> context) {
     if (!context || !context->handle) return std::nullopt;
+    std::lock_guard guard(context->mutex);
     {
-        std::lock_guard guard(context->mutex);
         const auto now = std::chrono::high_resolution_clock::now();
         if (!context->last_communication) context->last_communication = now;
         if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *context->last_communication).count() < 2) return std::nullopt;
     }
-    DEFER({
-        std::lock_guard guard(context->mutex);
-        context->last_communication = std::chrono::high_resolution_clock::now();
-    });
+    DEFER(context->last_communication = std::chrono::high_resolution_clock::now(););
     if (const auto res = context->handle->get_version(); res.has_value()) {
         context->version_major = std::get<0>(*res);
         context->version_minor = std::get<1>(*res);
@@ -33,21 +30,17 @@ std::optional<std::string> sc::visor::device_context::update(std::shared_ptr<dev
         const auto res = context->handle->get_axis_state(i);
         if (!res.has_value()) return res.error();
         if (!context->initial_communication_complete) {
-            context->mutex.lock();
             context->axes_ex[i].range_min = res->min;
             context->axes_ex[i].range_max = res->max;
             context->axes_ex[i].limit = res->limit;
-            context->mutex.unlock();
             if (res->curve_i > -1) {
                 const auto model_res = context->handle->get_bezier_model(res->curve_i);
                 if (!model_res.has_value()) return model_res.error();
-                context->mutex.lock();
                 for (int element_i = 0; element_i < context->axes_ex[i].model.size(); element_i++) {
                     context->axes_ex[i].model[element_i].x = glm::round((model_res.value()[element_i].x * static_cast<float>(std::numeric_limits<uint16_t>::max())) / 655.35f);
                     context->axes_ex[i].model[element_i].y = glm::round((model_res.value()[element_i].y * static_cast<float>(std::numeric_limits<uint16_t>::max())) / 655.35f);
                     spdlog::info(":: {} -> {}, {}", element_i, context->axes_ex[i].model[element_i].x, context->axes_ex[i].model[element_i].y);
                 }
-                context->mutex.unlock();
             }
         }
         context->axes[i] = *res;
