@@ -251,9 +251,6 @@ namespace sc::visor::gui {
                 ImGui::EndMenuBar();
             }
             if (ImGui::Button(context->axes[axis_i].enabled ? fmt::format("{} Disable", ICON_FA_PAUSE_CIRCLE).data() : fmt::format("{} Enable", ICON_FA_PLAY_CIRCLE).data(), { ImGui::GetContentRegionAvail().x, 0 })) context->handle->set_axis_enabled(axis_i, !context->axes[axis_i].enabled);
-            if (ImGui::Button(fmt::format("{} Retrieve Settings", ICON_FA_FILE_DOWNLOAD).data(), { ImGui::GetContentRegionAvail().x / 3, 0 }));
-            ImGui::SameLine();
-            if (ImGui::Button(fmt::format("{} Save Settings", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) context->handle->commit();
             if (ImGui::BeginChild("##{}InputRangeWindow", { 0, 164 }, true, ImGuiWindowFlags_MenuBar)) {
                 bool update_axis_range = false;
                 if (ImGui::BeginMenuBar()) {
@@ -406,10 +403,27 @@ namespace sc::visor::gui {
                 for (const auto &context : device_contexts) {
                     std::lock_guard guard(context->mutex);
                     if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, context->name, context->serial).data())) {
-                        if (context->handle) ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
-                        else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
+                        if (context->handle) {
+                            ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
+                            ImGui::SameLine();
+                            ImGui::TextDisabled(fmt::format("v{}.{}.{}", context->version_major, context->version_minor, context->version_revision).data());
+                        } else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
                         if (context->initial_communication_complete) {
+                            const auto top_y = ImGui::GetCursorScreenPos().y;
                             animation_comm.playing = false;
+                            if (ImGui::BeginChild("##DeviceInteractionBox", { 200, 200 }, true, ImGuiWindowFlags_MenuBar)) {
+                                if (ImGui::BeginMenuBar()) {
+                                    ImGui::Text(fmt::format("{} Controls", ICON_FA_SATELLITE_DISH).data());
+                                    ImGui::EndMenuBar();
+                                }
+                                if (ImGui::Button(fmt::format("{} Save to Memory", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
+                                    const auto err = context->handle->commit();
+                                    if (err) spdlog::error(*err);
+                                    else spdlog::info("Settings saved.");
+                                }
+                                if (ImGui::Button(fmt::format("{} Clear Memory", ICON_FA_ERASER).data(), { ImGui::GetContentRegionAvail().x, 0 }));
+                            }
+                            ImGui::EndChild();
                             static int current_selection;
                             if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                                 if (ImGui::BeginMenuBar()) {
@@ -427,7 +441,8 @@ namespace sc::visor::gui {
                                 }
                             }
                             ImGui::EndChild();
-                            ImGui::SameLine();
+                            ImGui::SameLine(0, ImGui::GetStyle().FramePadding.x);
+                            ImGui::SetCursorScreenPos({ ImGui::GetCursorScreenPos().x, top_y });
                             emit_axis_profile_slice(context, current_selection);
                         } else {
                             if (!animation_comm.playing) animation_comm.time = 164.0 / animation_comm.frame_rate;
