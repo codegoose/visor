@@ -323,11 +323,6 @@ static int _sc_entry_point() {
     return 0;
 }
 
-// #ifdef NDEBUG
-// #pragma message("Using WinMain.")
-// int WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, PSTR _command_line, int _command_show) {
-// #else
-int main() {
-// #endif
+int WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, PSTR _command_line, int _command_show) {
     return _sc_entry_point();
 }
