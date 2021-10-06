@@ -6,10 +6,10 @@
 #define SC_FEATURE_ENHANCED_FONTS
 #define SC_FEATURE_RENDER_ON_RESIZE
 
-#define SC_VIEW_INIT_W 672
+#define SC_VIEW_INIT_W 728
 #define SC_VIEW_INIT_H 636
-#define SC_VIEW_MIN_W 672
-#define SC_VIEW_MIN_H 636
+#define SC_VIEW_MIN_W SC_VIEW_INIT_W
+#define SC_VIEW_MIN_H SC_VIEW_INIT_H
 
 #include "../boot/imgui_gl3_glfw3.hpp"
 

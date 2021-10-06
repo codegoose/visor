@@ -260,7 +260,7 @@ namespace sc::visor::gui {
                 ImGui::ProgressBar(context->axes[axis_i].input_fraction, { ImGui::GetContentRegionAvail().x, 0 }, fmt::format("{}", context->axes[axis_i].input).data());
                 ImGui::SameLine();
                 ImGui::Text("Raw Input");
-                if (ImGui::Button(fmt::format(" {} ", ICON_FA_ANGLE_RIGHT).data())) {
+                if (ImGui::Button(fmt::format(" {} Set Min ", ICON_FA_ARROW_TO_LEFT).data(), { 100, 0 })) {
                     context->axes_ex[axis_i].range_min = context->axes[axis_i].input;
                     update_axis_range = true;
                 }
@@ -270,13 +270,13 @@ namespace sc::visor::gui {
                     ImGui::EndTooltip();
                 }
                 ImGui::SameLine();
-                ImGui::PushItemWidth(150);
+                ImGui::PushItemWidth(100);
                 if (ImGui::InputInt("Min", &context->axes_ex[axis_i].range_min)) update_axis_range = true;
                 ImGui::SameLine();
                 if (ImGui::InputInt("Max", &context->axes_ex[axis_i].range_max)) update_axis_range = true;
                 ImGui::PopItemWidth();
                 ImGui::SameLine();
-                if (ImGui::Button(fmt::format(" {} ", ICON_FA_ANGLE_LEFT).data())) {
+                if (ImGui::Button(fmt::format(" {} Set Max ", ICON_FA_ARROW_TO_RIGHT).data(), { 100, 0 })) {
                     context->axes_ex[axis_i].range_max = context->axes[axis_i].input;
                     update_axis_range = true;
                 }
