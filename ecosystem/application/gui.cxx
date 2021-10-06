@@ -250,7 +250,7 @@ namespace sc::visor::gui {
                 ImGui::Text(fmt::format("{} {} Configurations", ICON_FA_COGS, label_default).data());
                 ImGui::EndMenuBar();
             }
-            if (ImGui::Button(context->axes[axis_i].enabled ? fmt::format("{} Disable", ICON_FA_PAUSE_CIRCLE).data() : fmt::format("{} Enable", ICON_FA_PLAY_CIRCLE).data(), { ImGui::GetContentRegionAvail().x, 0 })) context->handle->set_axis_enabled(axis_i, !context->axes[axis_i].enabled);
+            if (ImGui::Button(context->axes[axis_i].enabled ? fmt::format("{} Disable", ICON_FA_STOP).data() : fmt::format("{} Enable", ICON_FA_PLAY).data(), { ImGui::GetContentRegionAvail().x, 0 })) context->handle->set_axis_enabled(axis_i, !context->axes[axis_i].enabled);
             if (ImGui::BeginChild("##{}InputRangeWindow", { 0, 164 }, true, ImGuiWindowFlags_MenuBar)) {
                 bool update_axis_range = false;
                 if (ImGui::BeginMenuBar()) {
