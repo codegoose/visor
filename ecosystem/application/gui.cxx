@@ -285,7 +285,6 @@ namespace sc::visor::gui {
                     ImGui::Text("Set the maximum range to the current raw input value.");
                     ImGui::EndTooltip();
                 }
-                ImGui::DragIntRange2("Min/Max", &context->axes_ex[axis_i].range_min, &context->axes_ex[axis_i].range_max);
                 if (ImGui::SliderInt("Output Limit##DZH", &context->axes_ex[axis_i].limit, 50, 100)) update_axis_range = true;
                 if (!context->axes[axis_i].enabled) ImGui::PushStyleColor(ImGuiCol_FrameBg, { 72.f / 255.f, 42.f / 255.f, 42.f / 255.f, 1.f });
                 ImGui::ProgressBar(context->axes[axis_i].output_fraction, { ImGui::GetContentRegionAvail().x, 0 });
