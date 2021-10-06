@@ -411,7 +411,7 @@ namespace sc::visor::gui {
                         if (context->initial_communication_complete) {
                             const auto top_y = ImGui::GetCursorScreenPos().y;
                             animation_comm.playing = false;
-                            if (ImGui::BeginChild("##DeviceInteractionBox", { 200, 200 }, true, ImGuiWindowFlags_MenuBar)) {
+                            if (ImGui::BeginChild("##DeviceInteractionBox", { 200, 86 }, true, ImGuiWindowFlags_MenuBar)) {
                                 if (ImGui::BeginMenuBar()) {
                                     ImGui::Text(fmt::format("{} Controls", ICON_FA_SATELLITE_DISH).data());
                                     ImGui::EndMenuBar();
