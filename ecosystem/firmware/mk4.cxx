@@ -195,7 +195,8 @@ tl::expected<sc::firmware::mk4::device_handle::axis_info, std::string> sc::firmw
         memcpy(&info.max, &res.value()->data()[11], sizeof(info.max));
         memcpy(&info.input, &res.value()->data()[13], sizeof(info.input));
         memcpy(&info.output, &res.value()->data()[15], sizeof(info.output));
-        memcpy(&info.limit, &res.value()->data()[17], sizeof(info.limit));
+        memcpy(&info.deadzone, &res.value()->data()[17], sizeof(info.deadzone));
+        memcpy(&info.limit, &res.value()->data()[18], sizeof(info.limit));
         info.input_fraction = (double)(info.input - std::numeric_limits<uint16_t>::min()) / (double)(std::numeric_limits<uint16_t>::max() - std::numeric_limits<uint16_t>::min());
         info.output_fraction = (double)(info.output - std::numeric_limits<uint16_t>::min()) / (double)(std::numeric_limits<uint16_t>::max() - std::numeric_limits<uint16_t>::min());
         return info;
@@ -233,7 +234,7 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_enabled(co
     }
 }
 
-std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(const int &index, const uint16_t &min, const uint16_t &max, const uint8_t &upper_limit) {
+std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(const int &index, const uint16_t &min, const uint16_t &max, const uint8_t &deadzone, const uint8_t &upper_limit) {
     std::array<std::byte, 64> buffer;
     memset(buffer.data(), 0, buffer.size());
     buffer[0] = static_cast<std::byte>('S');
@@ -247,7 +248,8 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
     buffer[9] = static_cast<std::byte>(index);
     memcpy(&buffer[10], &min, sizeof(min));
     memcpy(&buffer[12], &max, sizeof(max));
-    memcpy(&buffer[14], &upper_limit, sizeof(upper_limit));
+    memcpy(&buffer[14], &deadzone, sizeof(deadzone));
+    memcpy(&buffer[15], &upper_limit, sizeof(upper_limit));
     if (const auto res = write(buffer); res) return *res;
     const auto start = std::chrono::system_clock::now();
     for (;;) {
@@ -263,7 +265,8 @@ std::optional<std::string> sc::firmware::mk4::device_handle::set_axis_range(cons
         if (res.value()->data()[6] != static_cast<std::byte>(index)) continue;
         if (memcmp(&res.value()->data()[7], &min, sizeof(min)) != 0) continue;
         if (memcmp(&res.value()->data()[9], &max, sizeof(max)) != 0) continue;
-        if (memcmp(&res.value()->data()[11], &upper_limit, sizeof(upper_limit)) != 0) continue;
+        if (res.value()->data()[11] != static_cast<std::byte>(deadzone)) continue;
+        if (res.value()->data()[12] != static_cast<std::byte>(upper_limit)) continue;
         return std::nullopt;
     }
 }

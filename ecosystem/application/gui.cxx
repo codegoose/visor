@@ -250,10 +250,7 @@ namespace sc::visor::gui {
                 ImGui::Text(fmt::format("{} {} Configurations", ICON_FA_COGS, label_default).data());
                 ImGui::EndMenuBar();
             }
-            if (ImGui::Button(context->axes[axis_i].enabled ? fmt::format("{} Disable", ICON_FA_PAUSE_CIRCLE).data() : fmt::format("{} Enable", ICON_FA_PLAY_CIRCLE).data(), { ImGui::GetContentRegionAvail().x, 0 })) context->handle->set_axis_enabled(axis_i, !context->axes[axis_i].enabled);
-            if (ImGui::Button(fmt::format("{} Retrieve Settings", ICON_FA_FILE_DOWNLOAD).data(), { ImGui::GetContentRegionAvail().x / 3, 0 }));
-            ImGui::SameLine();
-            if (ImGui::Button(fmt::format("{} Save Settings", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) context->handle->commit();
+            if (ImGui::Button(context->axes[axis_i].enabled ? fmt::format("{} Disable", ICON_FA_STOP).data() : fmt::format("{} Enable", ICON_FA_PLAY).data(), { ImGui::GetContentRegionAvail().x, 0 })) context->handle->set_axis_enabled(axis_i, !context->axes[axis_i].enabled);
             if (ImGui::BeginChild("##{}InputRangeWindow", { 0, 164 }, true, ImGuiWindowFlags_MenuBar)) {
                 bool update_axis_range = false;
                 if (ImGui::BeginMenuBar()) {
@@ -263,7 +260,7 @@ namespace sc::visor::gui {
                 ImGui::ProgressBar(context->axes[axis_i].input_fraction, { ImGui::GetContentRegionAvail().x, 0 }, fmt::format("{}", context->axes[axis_i].input).data());
                 ImGui::SameLine();
                 ImGui::Text("Raw Input");
-                if (ImGui::Button(fmt::format(" {} ", ICON_FA_ANGLE_RIGHT).data())) {
+                if (ImGui::Button(fmt::format(" {} Set Min ", ICON_FA_ARROW_TO_LEFT).data(), { 100, 0 })) {
                     context->axes_ex[axis_i].range_min = context->axes[axis_i].input;
                     update_axis_range = true;
                 }
@@ -273,13 +270,13 @@ namespace sc::visor::gui {
                     ImGui::EndTooltip();
                 }
                 ImGui::SameLine();
-                ImGui::PushItemWidth(150);
+                ImGui::PushItemWidth(100);
                 if (ImGui::InputInt("Min", &context->axes_ex[axis_i].range_min)) update_axis_range = true;
                 ImGui::SameLine();
                 if (ImGui::InputInt("Max", &context->axes_ex[axis_i].range_max)) update_axis_range = true;
                 ImGui::PopItemWidth();
                 ImGui::SameLine();
-                if (ImGui::Button(fmt::format(" {} ", ICON_FA_ANGLE_LEFT).data())) {
+                if (ImGui::Button(fmt::format(" {} Set Max ", ICON_FA_ARROW_TO_RIGHT).data(), { 100, 0 })) {
                     context->axes_ex[axis_i].range_max = context->axes[axis_i].input;
                     update_axis_range = true;
                 }
@@ -288,10 +285,26 @@ namespace sc::visor::gui {
                     ImGui::Text("Set the maximum range to the current raw input value.");
                     ImGui::EndTooltip();
                 }
-                ImGui::DragIntRange2("Min/Max", &context->axes_ex[axis_i].range_min, &context->axes_ex[axis_i].range_max);
-                if (ImGui::SliderInt("Output Limit##DZH", &context->axes_ex[axis_i].limit, 50, 100)) update_axis_range = true;
+                if (ImGui::SliderInt("Deadzone", &context->axes_ex[axis_i].deadzone, 0, 30, "%d%%")) update_axis_range = true;
+                if (ImGui::SliderInt("Output Limit##DZH", &context->axes_ex[axis_i].limit, 50, 100, "%d%%")) update_axis_range = true;
                 if (!context->axes[axis_i].enabled) ImGui::PushStyleColor(ImGuiCol_FrameBg, { 72.f / 255.f, 42.f / 255.f, 42.f / 255.f, 1.f });
+                const auto old_y = ImGui::GetCursorPos().y;
+                ImGui::SetCursorPos({ ImGui::GetCursorPos().x, ImGui::GetCursorPos().y + 2 });
+                ImGui::Text(fmt::format("{}", ICON_FA_SIGNAL_SLASH).data());
+                ImGui::SameLine();
+                ImGui::SetCursorPos({ ImGui::GetCursorPos().x, old_y });
+                const int deadzone_padding = (context->axes_ex[axis_i].deadzone / 100.f) * static_cast<float>(context->axes[axis_i].max - context->axes[axis_i].min);
+                const float within_deadzone_fraction = context->axes[axis_i].input >= context->axes[axis_i].min ? (context->axes[axis_i].input < context->axes[axis_i].min + deadzone_padding ? (static_cast<float>(context->axes[axis_i].input - context->axes[axis_i].min) / static_cast<float>((context->axes[axis_i].min + deadzone_padding) - context->axes[axis_i].min)) : 1.f) : 0.f;
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 150.f / 255.f, 42.f / 255.f, 42.f / 255.f, 1.f });
+                if (context->axes_ex[axis_i].deadzone > 0) ImGui::ProgressBar(within_deadzone_fraction, { 80, 0 });
+                else ImGui::ProgressBar(0.f, { 80, 0 }, "--");
+                ImGui::PopStyleColor();
+                ImGui::SameLine();
+                ImGui::Text(fmt::format("{}", ICON_FA_SIGNAL).data());
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 72.f / 255.f, 150.f / 255.f, 42.f / 255.f, 1.f });
                 ImGui::ProgressBar(context->axes[axis_i].output_fraction, { ImGui::GetContentRegionAvail().x, 0 });
+                ImGui::PopStyleColor();
                 if (!context->axes[axis_i].enabled) {
                     ImGui::PopStyleColor();
                     if (ImGui::IsItemHovered()) {
@@ -301,7 +314,7 @@ namespace sc::visor::gui {
                     }
                 }
                 if (update_axis_range) {
-                    const auto err = context->handle->set_axis_range(axis_i, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].limit);
+                    const auto err = context->handle->set_axis_range(axis_i, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].deadzone, context->axes_ex[axis_i].limit);
                     if (err) spdlog::error(*err);
                     else spdlog::info("Updated axis #{} range: {}, {}, {}", axis_i, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].limit);
                 }
@@ -337,8 +350,9 @@ namespace sc::visor::gui {
                             static_cast<double>(percent.x) / 100.0,
                             static_cast<double>(percent.y) / 100.0
                         });
-                        float cif = static_cast<double>(context->axes[axis_i].input - context->axes[axis_i].min) / static_cast<double>(context->axes[axis_i].max - context->axes[axis_i].min);
-                        if (cif > 1.0f) cif = 1.0f;
+                        const int deadzone_padding = (context->axes_ex[axis_i].deadzone / 100.f) * static_cast<float>(context->axes[axis_i].max - context->axes[axis_i].min);
+                        auto cif = glm::max(0.0, static_cast<double>(context->axes[axis_i].input - (context->axes[axis_i].min + deadzone_padding)) / static_cast<double>(context->axes[axis_i].max - (context->axes[axis_i].min + deadzone_padding)));
+                        if (cif > 1.0) cif = 1.0;
                         if (context->axes_ex[axis_i].model_edit_i == context->axes[axis_i].curve_i) cubic_bezier_plot(model, { 200, 200 }, context->axes[axis_i].output_fraction, std::nullopt, context->axes_ex[axis_i].limit / 100.f, cif);
                         else cubic_bezier_plot(model, { 200, 200 }, std::nullopt, std::nullopt, context->axes_ex[axis_i].limit / 100.f, cif);
                     }
@@ -406,10 +420,27 @@ namespace sc::visor::gui {
                 for (const auto &context : device_contexts) {
                     std::lock_guard guard(context->mutex);
                     if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, context->name, context->serial).data())) {
-                        if (context->handle) ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
-                        else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
+                        if (context->handle) {
+                            ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
+                            ImGui::SameLine();
+                            ImGui::TextDisabled(fmt::format("v{}.{}.{}", context->version_major, context->version_minor, context->version_revision).data());
+                        } else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
                         if (context->initial_communication_complete) {
+                            const auto top_y = ImGui::GetCursorScreenPos().y;
                             animation_comm.playing = false;
+                            if (ImGui::BeginChild("##DeviceInteractionBox", { 200, 86 }, true, ImGuiWindowFlags_MenuBar)) {
+                                if (ImGui::BeginMenuBar()) {
+                                    ImGui::Text(fmt::format("{} Controls", ICON_FA_SATELLITE_DISH).data());
+                                    ImGui::EndMenuBar();
+                                }
+                                if (ImGui::Button(fmt::format("{} Save to Memory", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
+                                    const auto err = context->handle->commit();
+                                    if (err) spdlog::error(*err);
+                                    else spdlog::info("Settings saved.");
+                                }
+                                if (ImGui::Button(fmt::format("{} Clear Memory", ICON_FA_ERASER).data(), { ImGui::GetContentRegionAvail().x, 0 }));
+                            }
+                            ImGui::EndChild();
                             static int current_selection;
                             if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
                                 if (ImGui::BeginMenuBar()) {
@@ -427,7 +458,8 @@ namespace sc::visor::gui {
                                 }
                             }
                             ImGui::EndChild();
-                            ImGui::SameLine();
+                            ImGui::SameLine(0, ImGui::GetStyle().FramePadding.x);
+                            ImGui::SetCursorScreenPos({ ImGui::GetCursorScreenPos().x, top_y });
                             emit_axis_profile_slice(context, current_selection);
                         } else {
                             if (!animation_comm.playing) animation_comm.time = 164.0 / animation_comm.frame_rate;

@@ -1,4 +1,4 @@
-add_executable(visor WIN32
+add_executable(visor
     "visor.rc"
     "application.cxx"
     "main.cxx"
