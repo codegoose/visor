@@ -16,7 +16,7 @@ include_directories(
 )
 
 link_libraries(
-    "${PROJECT_SOURCE_DIR}/ecosystem/precompiled/rlottie/lib/Debug/rlottie.lib"
+    "${PROJECT_SOURCE_DIR}/ecosystem/precompiled/rlottie/lib/RelWithDebInfo/rlottie.lib"
 )
 
 set(CMAKE_CXX_STANDARD 17)
