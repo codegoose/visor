@@ -30,6 +30,7 @@ std::optional<std::string> sc::visor::device_context::update(std::shared_ptr<dev
         if (!context->initial_communication_complete) {
             context->axes_ex[axis_i].range_min = res->min;
             context->axes_ex[axis_i].range_max = res->max;
+            context->axes_ex[axis_i].deadzone = res->deadzone;
             context->axes_ex[axis_i].limit = res->limit;
             context->axes_ex[axis_i].model_edit_i = res->curve_i;
         }

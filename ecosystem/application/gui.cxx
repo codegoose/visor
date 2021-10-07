@@ -285,9 +285,26 @@ namespace sc::visor::gui {
                     ImGui::Text("Set the maximum range to the current raw input value.");
                     ImGui::EndTooltip();
                 }
-                if (ImGui::SliderInt("Output Limit##DZH", &context->axes_ex[axis_i].limit, 50, 100)) update_axis_range = true;
+                if (ImGui::SliderInt("Deadzone", &context->axes_ex[axis_i].deadzone, 0, 30, "%d%%")) update_axis_range = true;
+                if (ImGui::SliderInt("Output Limit##DZH", &context->axes_ex[axis_i].limit, 50, 100, "%d%%")) update_axis_range = true;
                 if (!context->axes[axis_i].enabled) ImGui::PushStyleColor(ImGuiCol_FrameBg, { 72.f / 255.f, 42.f / 255.f, 42.f / 255.f, 1.f });
+                const auto old_y = ImGui::GetCursorPos().y;
+                ImGui::SetCursorPos({ ImGui::GetCursorPos().x, ImGui::GetCursorPos().y + 2 });
+                ImGui::Text(fmt::format("{}", ICON_FA_SIGNAL_SLASH).data());
+                ImGui::SameLine();
+                ImGui::SetCursorPos({ ImGui::GetCursorPos().x, old_y });
+                const int deadzone_padding = (context->axes_ex[axis_i].deadzone / 100.f) * static_cast<float>(context->axes[axis_i].max - context->axes[axis_i].min);
+                const float within_deadzone_fraction = context->axes[axis_i].input >= context->axes[axis_i].min ? (context->axes[axis_i].input < context->axes[axis_i].min + deadzone_padding ? (static_cast<float>(context->axes[axis_i].input - context->axes[axis_i].min) / static_cast<float>((context->axes[axis_i].min + deadzone_padding) - context->axes[axis_i].min)) : 1.f) : 0.f;
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 150.f / 255.f, 42.f / 255.f, 42.f / 255.f, 1.f });
+                if (context->axes_ex[axis_i].deadzone > 0) ImGui::ProgressBar(within_deadzone_fraction, { 80, 0 });
+                else ImGui::ProgressBar(0.f, { 80, 0 }, "--");
+                ImGui::PopStyleColor();
+                ImGui::SameLine();
+                ImGui::Text(fmt::format("{}", ICON_FA_SIGNAL).data());
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 72.f / 255.f, 150.f / 255.f, 42.f / 255.f, 1.f });
                 ImGui::ProgressBar(context->axes[axis_i].output_fraction, { ImGui::GetContentRegionAvail().x, 0 });
+                ImGui::PopStyleColor();
                 if (!context->axes[axis_i].enabled) {
                     ImGui::PopStyleColor();
                     if (ImGui::IsItemHovered()) {
@@ -297,7 +314,7 @@ namespace sc::visor::gui {
                     }
                 }
                 if (update_axis_range) {
-                    const auto err = context->handle->set_axis_range(axis_i, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].limit);
+                    const auto err = context->handle->set_axis_range(axis_i, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].deadzone, context->axes_ex[axis_i].limit);
                     if (err) spdlog::error(*err);
                     else spdlog::info("Updated axis #{} range: {}, {}, {}", axis_i, context->axes_ex[axis_i].range_min, context->axes_ex[axis_i].range_max, context->axes_ex[axis_i].limit);
                 }
@@ -333,8 +350,9 @@ namespace sc::visor::gui {
                             static_cast<double>(percent.x) / 100.0,
                             static_cast<double>(percent.y) / 100.0
                         });
-                        float cif = static_cast<double>(context->axes[axis_i].input - context->axes[axis_i].min) / static_cast<double>(context->axes[axis_i].max - context->axes[axis_i].min);
-                        if (cif > 1.0f) cif = 1.0f;
+                        const int deadzone_padding = (context->axes_ex[axis_i].deadzone / 100.f) * static_cast<float>(context->axes[axis_i].max - context->axes[axis_i].min);
+                        auto cif = glm::max(0.0, static_cast<double>(context->axes[axis_i].input - (context->axes[axis_i].min + deadzone_padding)) / static_cast<double>(context->axes[axis_i].max - (context->axes[axis_i].min + deadzone_padding)));
+                        if (cif > 1.0) cif = 1.0;
                         if (context->axes_ex[axis_i].model_edit_i == context->axes[axis_i].curve_i) cubic_bezier_plot(model, { 200, 200 }, context->axes[axis_i].output_fraction, std::nullopt, context->axes_ex[axis_i].limit / 100.f, cif);
                         else cubic_bezier_plot(model, { 200, 200 }, std::nullopt, std::nullopt, context->axes_ex[axis_i].limit / 100.f, cif);
                     }
