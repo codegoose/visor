@@ -323,6 +323,6 @@ static int _sc_entry_point() {
     return 0;
 }
 
-int main() {
+int WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, PSTR _command_line, int _command_show) {
     return _sc_entry_point();
 }
