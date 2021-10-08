@@ -1,4 +1,4 @@
-add_executable(overlay
+add_executable(overlay WIN32
     "overlay.rc"
     "main.cxx"
 )
