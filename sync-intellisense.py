@@ -35,6 +35,14 @@ if not 'configurations' in doc or len(doc['configurations']) == 0:
     quit()
 
 doc_includes = doc['configurations'][0]['includePath']
+workspace_doc_includes = [ ]
+
+for include in doc_includes:
+    if include.startswith('${workspaceFolder}'):
+        workspace_doc_includes.append(include)
+        print('Preserving: ', include)
+
+doc_includes = workspace_doc_includes
 
 for include in includes:
     if include in doc_includes:
