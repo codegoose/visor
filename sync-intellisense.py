@@ -1,6 +1,6 @@
 import os, json
 
-props_path = '.vscode/c_cpp_properties.json'
+props_path = '../.vscode/c_cpp_properties.json'
 props_exists = os.path.exists(props_path)
 
 print('C/CPP properties exists:', props_exists, '("%s")' % props_path)
@@ -8,7 +8,7 @@ print('C/CPP properties exists:', props_exists, '("%s")' % props_path)
 if not props_exists:
     quit()
 
-info_path = 'build/conanbuildinfo.txt'
+info_path = 'conanbuildinfo.txt'
 info_exists = os.path.exists(info_path)
 
 print('Conan build info exists:', info_exists, '("%s")' % info_path)
