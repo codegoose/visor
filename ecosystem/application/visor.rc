@@ -7,9 +7,7 @@ LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 GLFW_ICON ICON ".\\visor.ico"
 TRAY_ICON ICON ".\\visor.ico"
 
-FONT_DEFAULT DATA ".\\resources\\seguisb.ttf"
-FONT_FA_SOLID DATA ".\\resources\\fa-solid-900.ttf"
-FONT_FA_BRANDS DATA ".\\resources\\fa-brands-400.ttf"
+#include "../font/resources.rc"
 
 LOTTIE_LOADING DATA ".\\resources\\57-loading-semicircle.json"
 LOTTIE_COMMUNICATING DATA ".\\resources\\41611-interactive-digital-assistant.json"
