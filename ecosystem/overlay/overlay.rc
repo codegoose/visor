@@ -4,13 +4,10 @@
 
 LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 
-GLFW_ICON ICON ".\\visor.ico"
-TRAY_ICON ICON ".\\visor.ico"
+GLFW_ICON ICON ".\\overlay.ico"
+TRAY_ICON ICON ".\\overlay.ico"
 
 #include "../font/resources.rc"
-
-LOTTIE_LOADING DATA ".\\resources\\57-loading-semicircle.json"
-LOTTIE_COMMUNICATING DATA ".\\resources\\41611-interactive-digital-assistant.json"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION SC_FILE_VER
