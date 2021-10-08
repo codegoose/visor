@@ -87,7 +87,12 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-    const auto glfw_window = glfwCreateWindow(initial_framebuffer_size.x, initial_framebuffer_size.y, fmt::format("{} v{}", SC_APP_NAME, SC_APP_VER).data(), nullptr, nullptr);
+    #ifdef EON_DEBUG
+    const auto glfw_window_title = fmt::format("{} v{} (Development Build)", SC_APP_NAME, SC_APP_VER);
+    #else
+    const auto glfw_window_title = fmt::format("{} v{}", SC_APP_NAME, SC_APP_VER);
+    #endif
+    const auto glfw_window = glfwCreateWindow(initial_framebuffer_size.x, initial_framebuffer_size.y, glfw_window_title.data(), nullptr, nullptr);
     if (!glfw_window) return "Failed to create window.";
     DEFER({
         spdlog::debug("Destroying main window...");
@@ -340,6 +345,6 @@ static int _sc_entry_point() {
     return 0;
 }
 
-int WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, PSTR _command_line, int _command_show) {
+int main() {
     return _sc_entry_point();
 }
