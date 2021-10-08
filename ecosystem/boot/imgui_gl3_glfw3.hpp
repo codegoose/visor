@@ -126,6 +126,22 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
         #pragma message("[EON] Using Freetype to enhance fonts.")
         if (!sc::font::imgui::load(16)) return "Failed to load fonts.";
     #endif
+    #ifdef SC_FEATURE_CENTER_WINDOW
+        #pragma message("[EON] Centering window.")
+        if (const auto monitor = glfwGetPrimaryMonitor(); monitor) {
+            int mx, my, mw, mh;
+            glfwGetMonitorWorkarea(monitor, &mx, &my, &mw, &mh);
+            if (mw != 0 && mh != 0) {
+                int x, y;
+                glfwGetWindowPos(glfw_window, &x, &y);
+                int w, h;
+                glfwGetWindowSize(glfw_window, &w, &h);
+                if (w != 0 && h != 0) {
+                    glfwSetWindowPos(glfw_window, mx + (mw / 2) - (w / 2), my + (mh / 2) - (h / 2));
+                }
+            }
+        }
+    #endif
     spdlog::info("Bootstrapping completed.");
     if (const auto cb_err = success_cb(glfw_window, imgui_ctx /* , vigem_client, vigem_pad */); cb_err.has_value()) {
         spdlog::warn("Bootstrap success routine returned an error: {}", *cb_err);
