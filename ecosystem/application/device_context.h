@@ -38,7 +38,7 @@ namespace sc::visor {
             std::array<char, 50> label_buffer = { 0 };
         };
 
-        std::array<model, 10> models;
+        std::array<model, 5> models;
 
         std::mutex mutex;
         std::optional<std::chrono::high_resolution_clock::time_point> last_communication;
