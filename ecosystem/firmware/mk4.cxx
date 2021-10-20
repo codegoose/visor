@@ -26,7 +26,7 @@ tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std
     firmware::prepare_subsystem();
     const uint16_t vendor_id = 0x16d0, product_id = 0x10db;
     std::vector<std::shared_ptr<device_handle>> handles;
-	if (const auto devs = hid_enumerate(vendor_id, product_id); devs) {
+	if (const auto devs = hid_enumerate(0, 0); devs) {
         auto cur_dev = devs;
         while (cur_dev) {
             DEFER(cur_dev = cur_dev->next);
