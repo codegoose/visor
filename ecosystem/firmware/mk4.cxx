@@ -24,7 +24,7 @@ sc::firmware::mk4::device_handle::~device_handle() {
 
 tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string> sc::firmware::mk4::discover(const std::optional<std::vector<std::shared_ptr<device_handle>>> &existing) {
     firmware::prepare_subsystem();
-    const uint16_t vendor_id = 0x16C0, product_id = 0x0476;
+    const uint16_t vendor_id = 0x16d0, product_id = 0x10db;
     std::vector<std::shared_ptr<device_handle>> handles;
 	if (const auto devs = hid_enumerate(vendor_id, product_id); devs) {
         auto cur_dev = devs;
