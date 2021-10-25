@@ -1,4 +1,8 @@
+#!/usr/bin/env python3
+
 import os, json
+
+is_rel = os.path.abspath('.').endswith('_rel')
 
 props_path = '../.vscode/c_cpp_properties.json'
 props_exists = os.path.exists(props_path)
@@ -61,5 +65,18 @@ for define in defines:
         continue
     print('Adding to defines:', define)
     doc_defines.append(define)
+
+if is_rel:
+    if 'EON_RELEASE' not in doc_defines:
+        doc_defines.append('EON_RELEASE')
+    if 'EON_DEVELOPMENT' in doc_defines:
+        doc_defines.remove('EON_DEVELOPMENT')
+    print('Added EON_RELEASE.')
+else:
+    if 'EON_DEVELOPMENT' not in doc_defines:
+        doc_defines.append('EON_DEVELOPMENT')
+    if 'EON_RELEASE' in doc_defines:
+        doc_defines.remove('EON_RELEASE')
+    print('Added EON_DEVELOPMENT.')
 
 open(props_path, 'w').write(json.dumps(doc, indent=4))
