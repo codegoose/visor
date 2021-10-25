@@ -18,6 +18,7 @@ target_link_libraries(visor
     CONAN_PKG::freetype
     CONAN_PKG::pystring
 
+    api
     boot
     imgui
     hidhide
