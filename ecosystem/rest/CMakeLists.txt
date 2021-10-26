@@ -8,3 +8,12 @@ target_link_libraries(rest
     CONAN_PKG::tl-expected
     CONAN_PKG::spdlog
 )
+
+add_executable(test_rest
+    "test_rest.cxx"
+)
+
+target_link_libraries(test_rest
+    rest
+    api
+)
