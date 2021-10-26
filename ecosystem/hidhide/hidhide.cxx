@@ -429,9 +429,15 @@ bool sc::hidhide::set_whitelist(const std::vector<std::filesystem::path> &new_li
     DWORD num_bytes_needed;
     std::vector<std::wstring> wide_string_list;
     for (auto &path : new_list) {
-        auto image = convert_path_to_image_path(path);
-        if (!image.has_value()) return false;
-        wide_string_list.push_back(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().from_bytes(image->string()));
+        if (path.string().front() == '\\') wide_string_list.push_back(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().from_bytes(path.string()));
+        else {
+            auto image = convert_path_to_image_path(path);
+            if (!image.has_value()) {
+                spdlog::error("Unable to convert path to image path: {}", path.string());
+                return false;
+            }
+            wide_string_list.push_back(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().from_bytes(image->string()));
+        }
     }
     auto buffer = string_list_to_multi_string(wide_string_list);
     if (!buffer.has_value()) return false;
