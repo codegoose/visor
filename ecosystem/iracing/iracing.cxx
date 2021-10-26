@@ -25,6 +25,8 @@ namespace sc::iracing {
     static std::thread worker;
     static std::atomic_bool working = false;
 
+    static std::atomic<status> current_status = status::stopped;
+
     struct variable_buffer_header {
 
         int32_t tick_count;
@@ -74,24 +76,31 @@ namespace sc::iracing {
         for (int i = 0; i < telemetry_header->num_variables; i++) {
             if (strcmp("RPM", reinterpret_cast<char *>(variables[i].name)) == 0) {
                 auto value = reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
-                spdlog::info("{}, {}", *value, variables[i].type);
+                spdlog::info("RPM: {}, {}", *value, variables[i].type);
             } else if (strcmp("LapDistPct", reinterpret_cast<char *>(variables[i].name)) == 0) {
                 auto value = reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
-                spdlog::info("{}, {}", *value, variables[i].type);
+                spdlog::info("LapDistPct: {}, {}", *value, variables[i].type);
+            } else if (strcmp("IsOnTrack", reinterpret_cast<char *>(variables[i].name)) == 0) {
+                auto value = reinterpret_cast<uint8_t *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
+                spdlog::info("IsOnTrack: {}, {}", static_cast<int>(*value), variables[i].type);
             }
         }
     }
 
     static void work() {
+        DEFER(
+            current_status = status::stopped;
+        );
         std::optional<std::chrono::system_clock::time_point> last_file_handle_open_attempt;
         for (;;) {
+            current_status = status::searching;
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             if (!working) return;
             if (!last_file_handle_open_attempt || std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - *last_file_handle_open_attempt).count() > 1) {
                 std::optional<HANDLE> file_handle;;
                 std::optional<std::byte *> mapped_file_buffer;
                 std::optional<HANDLE> event_handle;
-                DEFER({
+                DEFER(
                     if (event_handle) {
                         CloseHandle(*event_handle);
                         spdlog::debug("Closed iRacing event handle.");
@@ -108,7 +117,7 @@ namespace sc::iracing {
                         file_handle.reset();
                     }
                     last_file_handle_open_attempt = std::chrono::system_clock::now();
-                });
+                );
                 if (const auto attempted_handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, mapped_file_name); attempted_handle) {
                     file_handle = attempted_handle;
                     if (const auto attempted_mapped_buffer = MapViewOfFile(*file_handle, FILE_MAP_ALL_ACCESS, 0, 0, mapped_file_length); attempted_mapped_buffer) {
@@ -119,10 +128,13 @@ namespace sc::iracing {
                             while (working) {
                                 const auto wait_res = WaitForSingleObject(*event_handle, 1000);
                                 if (wait_res == WAIT_OBJECT_0) {
+                                    current_status = status::live;
                                     process_telemetry(
                                         reinterpret_cast<header *>(*mapped_file_buffer),
                                         reinterpret_cast<variable_header *>(reinterpret_cast<uintptr_t>(*mapped_file_buffer) + reinterpret_cast<header *>(*mapped_file_buffer)->variables_header_offset)
                                     );
+                                } else if (wait_res == WAIT_TIMEOUT) {
+                                    current_status = status::connected;
                                 } else if (wait_res == WAIT_ABANDONED) {
                                     spdlog::warn("iRacing synchronization handle was abandoned.");
                                     break;
@@ -153,4 +165,8 @@ void sc::iracing::shutdown() {
         worker.join();
         spdlog::debug("Shutdown iRacing telemetry worker.");
     }
+}
+
+sc::iracing::status sc::iracing::get_status() {
+    return current_status;
 }
