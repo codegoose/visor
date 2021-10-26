@@ -18,6 +18,7 @@
 #include "../iracing/iracing.h"
 
 #include "legacy.h"
+
 static std::optional<std::string> sc::boot::on_startup() {
     iracing::startup();
     visor::gui::initialize();
@@ -32,7 +33,7 @@ static tl::expected<bool, std::string> sc::boot::on_fixed_update() {
 }
 
 static tl::expected<bool, std::string> sc::boot::on_update(const glm::ivec2 &framebuffer_size, bool *const force_redraw) {
-    sc::visor::gui::emit(framebuffer_size, force_redraw);
+    visor::gui::emit(framebuffer_size, force_redraw);
     visor::legacy::process();
     return visor::keep_running;
 }
