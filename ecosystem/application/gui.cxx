@@ -2,6 +2,7 @@
 #include "application.h"
 #include "animation_instance.h"
 #include "device_context.h"
+#include "legacy.h"
 
 #include <string_view>
 #include <array>
@@ -31,6 +32,8 @@ namespace sc::visor::gui {
     static std::future<tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string>> devices_future;
     static std::vector<std::shared_ptr<firmware::mk4::device_handle>> devices;
     static std::vector<std::shared_ptr<device_context>> device_contexts;
+
+    static bool enable_legacy_support = false;
 
     static void prepare_styling_colors(ImGuiStyle &style) {
         style.Colors[ImGuiCol_Tab] = { 50.f / 255.f, 50.f / 255.f, 50.f / 255.f, 1.f };
@@ -409,92 +412,108 @@ namespace sc::visor::gui {
     }
 
     static void emit_content_device_panel() {
-        enum class selection_type {
-            axis,
-            button,
-            hat
-        };
-        if (device_contexts.size()) {
-            animation_scan.playing = false;
-            if (ImGui::BeginTabBar("##DeviceTabBar")) {
-                for (const auto &context : device_contexts) {
-                    std::lock_guard guard(context->mutex);
-                    if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, context->name, context->serial).data())) {
-                        if (context->handle) {
-                            ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
-                            ImGui::SameLine();
-                            ImGui::TextDisabled(fmt::format("v{}.{}.{}", context->version_major, context->version_minor, context->version_revision).data());
-                        } else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
-                        if (context->initial_communication_complete) {
-                            const auto top_y = ImGui::GetCursorScreenPos().y;
-                            animation_comm.playing = false;
-                            if (ImGui::BeginChild("##DeviceInteractionBox", { 200, 86 }, true, ImGuiWindowFlags_MenuBar)) {
-                                if (ImGui::BeginMenuBar()) {
-                                    ImGui::Text(fmt::format("{} Controls", ICON_FA_SATELLITE_DISH).data());
-                                    ImGui::EndMenuBar();
-                                }
-                                if (ImGui::Button(fmt::format("{} Save to Chip", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
-                                    const auto err = context->handle->commit();
-                                    if (err) spdlog::error(*err);
-                                    else spdlog::info("Settings saved.");
-                                }
-                                if (ImGui::Button(fmt::format("{} Clear Chip", ICON_FA_ERASER).data(), { ImGui::GetContentRegionAvail().x, 0 }));
-                            }
-                            ImGui::EndChild();
-                            static int current_selection;
-                            if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
-                                if (ImGui::BeginMenuBar()) {
-                                    ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
-                                    ImGui::EndMenuBar();
-                                }
-                                if (const auto num_axes = context->axes.size(); num_axes) {
-                                    for (int i = 0; i < num_axes; i++) {
-                                        switch (i) {
-                                            case 0: if (ImGui::Selectable("Throttle", current_selection == 0)) current_selection = 0; break;
-                                            case 1: if (ImGui::Selectable("Brake", current_selection == 1)) current_selection = 1; break;
-                                            case 2: if (ImGui::Selectable("Clutch", current_selection == 2)) current_selection = 2; break;
+        if (ImGui::BeginTabBar("##AppModeBar")) {
+            if (ImGui::BeginTabItem(fmt::format("{} Account", ICON_FA_USER).data())) {
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_TOOLS).data())) {
+                enum class selection_type {
+                    axis,
+                    button,
+                    hat
+                };
+                if (device_contexts.size() || enable_legacy_support) {
+                    animation_scan.playing = false;
+                    if (ImGui::BeginTabBar("##DeviceTabBar")) {
+                        for (const auto &context : device_contexts) {
+                            std::lock_guard guard(context->mutex);
+                            if (ImGui::BeginTabItem(fmt::format("{} {}##{}", ICON_FA_MICROCHIP, context->name, context->serial).data())) {
+                                if (context->handle) {
+                                    ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Connected.", ICON_FA_CHECK_DOUBLE).data());
+                                    ImGui::SameLine();
+                                    ImGui::TextDisabled(fmt::format("v{}.{}.{}", context->version_major, context->version_minor, context->version_revision).data());
+                                } else ImGui::TextColored({ 1, 1, .2f, 1 }, fmt::format("{} Not connected.", ICON_FA_SPINNER).data());
+                                if (context->initial_communication_complete) {
+                                    const auto top_y = ImGui::GetCursorScreenPos().y;
+                                    animation_comm.playing = false;
+                                    if (ImGui::BeginChild("##DeviceInteractionBox", { 200, 86 }, true, ImGuiWindowFlags_MenuBar)) {
+                                        if (ImGui::BeginMenuBar()) {
+                                            ImGui::Text(fmt::format("{} Controls", ICON_FA_SATELLITE_DISH).data());
+                                            ImGui::EndMenuBar();
+                                        }
+                                        if (ImGui::Button(fmt::format("{} Save to Chip", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            const auto err = context->handle->commit();
+                                            if (err) spdlog::error(*err);
+                                            else spdlog::info("Settings saved.");
+                                        }
+                                        if (ImGui::Button(fmt::format("{} Clear Chip", ICON_FA_ERASER).data(), { ImGui::GetContentRegionAvail().x, 0 }));
+                                    }
+                                    ImGui::EndChild();
+                                    static int current_selection;
+                                    if (ImGui::BeginChild("##DeviceHardwareList", { 200, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                                        if (ImGui::BeginMenuBar()) {
+                                            ImGui::Text(fmt::format("{} Inputs", ICON_FA_SITEMAP).data());
+                                            ImGui::EndMenuBar();
+                                        }
+                                        if (const auto num_axes = context->axes.size(); num_axes) {
+                                            for (int i = 0; i < num_axes; i++) {
+                                                switch (i) {
+                                                    case 0: if (ImGui::Selectable("Throttle", current_selection == 0)) current_selection = 0; break;
+                                                    case 1: if (ImGui::Selectable("Brake", current_selection == 1)) current_selection = 1; break;
+                                                    case 2: if (ImGui::Selectable("Clutch", current_selection == 2)) current_selection = 2; break;
+                                                }
+                                            }
                                         }
                                     }
+                                    ImGui::EndChild();
+                                    ImGui::SameLine(0, ImGui::GetStyle().FramePadding.x);
+                                    ImGui::SetCursorScreenPos({ ImGui::GetCursorScreenPos().x, top_y });
+                                    emit_axis_profile_slice(context, current_selection);
+                                } else {
+                                    if (!animation_comm.playing) animation_comm.time = 164.0 / animation_comm.frame_rate;
+                                    animation_comm.playing = true;
+                                    ImPenUtility pen;
+                                    pen.CalculateWindowBounds();
+                                    const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_comm.frames[animation_comm.frame_i]->size));
+                                    ImGui::SetCursorScreenPos(image_pos);
+                                    if (animation_comm.frames.size()) {
+                                        ImGui::Image(
+                                            reinterpret_cast<ImTextureID>(animation_comm.frames[animation_comm.frame_i]->handle),
+                                            GLMD_IM2(animation_comm.frames[animation_comm.frame_i]->size)
+                                        );
+                                    }
                                 }
-                            }
-                            ImGui::EndChild();
-                            ImGui::SameLine(0, ImGui::GetStyle().FramePadding.x);
-                            ImGui::SetCursorScreenPos({ ImGui::GetCursorScreenPos().x, top_y });
-                            emit_axis_profile_slice(context, current_selection);
-                        } else {
-                            if (!animation_comm.playing) animation_comm.time = 164.0 / animation_comm.frame_rate;
-                            animation_comm.playing = true;
-                            ImPenUtility pen;
-                            pen.CalculateWindowBounds();
-                            const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_comm.frames[animation_comm.frame_i]->size));
-                            ImGui::SetCursorScreenPos(image_pos);
-                            if (animation_comm.frames.size()) {
-                                ImGui::Image(
-                                    reinterpret_cast<ImTextureID>(animation_comm.frames[animation_comm.frame_i]->handle),
-                                    GLMD_IM2(animation_comm.frames[animation_comm.frame_i]->size)
-                                );
+                                ImGui::EndTabItem();
                             }
                         }
-                        ImGui::EndTabItem();
+                        if (enable_legacy_support && ImGui::BeginTabItem(fmt::format("{} Virtual Xbox Controller", ICON_FA_GAMEPAD).data())) {
+                            ImGui::EndTabItem();
+                        }
+                        ImGui::EndTabBar();
+                    }
+                } else {
+                    animation_scan.play = true;
+                    ImPenUtility pen;
+                    pen.CalculateWindowBounds();
+                    const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
+                    ImGui::SetCursorScreenPos(image_pos);
+                    if (animation_scan.frames.size()) {
+                        ImGui::Image(
+                            reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
+                            GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
+                            { 0, 0 },
+                            { 1, 1 },
+                            { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
+                        );
                     }
                 }
-                ImGui::EndTabBar();
+                ImGui::EndTabItem();
             }
-        } else {
-            animation_scan.play = true;
-            ImPenUtility pen;
-            pen.CalculateWindowBounds();
-            const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
-            ImGui::SetCursorScreenPos(image_pos);
-            if (animation_scan.frames.size()) {
-                ImGui::Image(
-                    reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
-                    GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
-                    { 0, 0 },
-                    { 1, 1 },
-                    { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
-                );
+            if (ImGui::BeginTabItem(fmt::format("{} iRacing", ICON_FA_FLAG_CHECKERED).data())) {
+                ImGui::Text(fmt::format("Status: {}", magic_enum::enum_name(iracing::get_status())).data());
+                ImGui::EndTabItem();
             }
+            ImGui::EndTabBar();
         }
     }
 
@@ -518,6 +537,12 @@ namespace sc::visor::gui {
                         device_contexts.clear();
                     }
                 } else ImGui::TextDisabled("No devices.");
+                if (ImGui::Selectable(fmt::format("{} {} Legacy Support", ICON_FA_RECYCLE, enable_legacy_support ? "Disable" : "Enable").data())) {
+                    if (enable_legacy_support) {
+                        legacy::disable();
+                        enable_legacy_support = false;
+                    } else if (legacy::enable()) enable_legacy_support = true;
+                }
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(fmt::format("{} Help", ICON_FA_QUESTION_CIRCLE).data())) {

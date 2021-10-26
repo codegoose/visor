@@ -6,6 +6,7 @@ add_executable(visor
     "version.cxx"
     "animation_instance.cxx"
     "device_context.cxx"
+    "legacy.cxx"
 )
 
 target_link_libraries(visor
