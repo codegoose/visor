@@ -523,16 +523,16 @@ namespace sc::visor::gui {
 
     static void emit_primary_window_menu_bar() {
         if (ImGui::BeginMenuBar()) {
-            if (ImGui::BeginMenu(fmt::format("{} File", ICON_FA_FILE_CODE).data())) {
-                // if (ImGui::Selectable(fmt::format("{} Theme", ICON_FA_PAINT_ROLLER).data()));
+            if (ImGui::BeginMenu(fmt::format("{} File", ICON_FA_SAVE).data())) {
+                if (ImGui::Selectable(fmt::format("{} Theme", ICON_FA_PAINT_ROLLER).data()));
                 if (ImGui::Selectable(fmt::format("{} Quit", ICON_FA_SKULL).data())) keep_running = false;
                 ImGui::EndMenu();
             }
-            if (ImGui::BeginMenu(fmt::format("{} Devices", ICON_FA_CUBES).data())) {
+            if (ImGui::BeginMenu(fmt::format("{} System", ICON_FA_CALCULATOR).data())) {
                 if (devices.size() || device_contexts.size()) {
                     for (auto &device : devices) ImGui::TextDisabled(fmt::format("{} {} {} (#{})", ICON_FA_MICROCHIP, device->org, device->name, device->serial).data());
-                    ImGui::Selectable(fmt::format("{} Clear System Calibrations", ICON_FA_ERASER).data());
-                    if (ImGui::Selectable(fmt::format("{} Release All", ICON_FA_STOP).data())) {
+                    ImGui::Selectable(fmt::format("{} Clear Axis Calibrations", ICON_FA_ERASER).data());
+                    if (ImGui::Selectable(fmt::format("{} Release Hardware", ICON_FA_STOP).data())) {
                         devices.clear();
                         device_contexts.clear();
                     }
