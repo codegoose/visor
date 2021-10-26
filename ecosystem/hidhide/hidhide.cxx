@@ -141,7 +141,7 @@ namespace sc::hidhide {
         auto volume_mount_point = find_volume_mount_point_for_path(path);
         if (!volume_mount_point.has_value()) return std::nullopt;
         auto volume_name = get_volume_name_for_volume_mount_point(volume_mount_point.value());
-        if (!volume_mount_point.has_value()) return std::nullopt;
+        if (!volume_name.has_value()) return std::nullopt;
         auto dos_device_name = get_dos_device_name_for_volume_name(volume_name.value());
         auto name_without_mount_point = std::filesystem::path(path.native().substr(volume_mount_point.value().native().size()));
         return dos_device_name.value() / name_without_mount_point;
