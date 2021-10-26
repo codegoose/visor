@@ -24,7 +24,6 @@ static std::optional<std::string> sc::boot::on_startup() {
     if (const auto res = sc::api::customer::get_session_token("miranda@google.com", "abc123").get(); res) {
         spdlog::critical("Session key: {}", res->dump());
     } else spdlog::error(res.error());
-    std::this_thread::sleep_for(std::chrono::seconds(4));
     return std::nullopt;
 }
 
