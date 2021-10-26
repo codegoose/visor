@@ -433,12 +433,12 @@ namespace sc::visor::gui {
                                     ImGui::Text(fmt::format("{} Controls", ICON_FA_SATELLITE_DISH).data());
                                     ImGui::EndMenuBar();
                                 }
-                                if (ImGui::Button(fmt::format("{} Save to Memory", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
+                                if (ImGui::Button(fmt::format("{} Save to Chip", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
                                     const auto err = context->handle->commit();
                                     if (err) spdlog::error(*err);
                                     else spdlog::info("Settings saved.");
                                 }
-                                if (ImGui::Button(fmt::format("{} Clear Memory", ICON_FA_ERASER).data(), { ImGui::GetContentRegionAvail().x, 0 }));
+                                if (ImGui::Button(fmt::format("{} Clear Chip", ICON_FA_ERASER).data(), { ImGui::GetContentRegionAvail().x, 0 }));
                             }
                             ImGui::EndChild();
                             static int current_selection;
