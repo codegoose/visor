@@ -30,4 +30,5 @@ target_link_libraries(visor
     file
     cimpl
     firmware
+    iracing
 )

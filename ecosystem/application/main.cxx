@@ -13,8 +13,10 @@
 
 #include "../boot/imgui_gl3_glfw3.hpp"
 #include "../api/api.h"
+#include "../iracing/iracing.h"
 
 static std::optional<std::string> sc::boot::on_startup() {
+    iracing::startup();
     visor::gui::initialize();
     if (const auto res = sc::api::customer::get_session_token("miranda@google.com", "abc123").get(); res) {
         spdlog::critical("Session key: {}", res->dump());
@@ -34,4 +36,5 @@ static tl::expected<bool, std::string> sc::boot::on_update(const glm::ivec2 &fra
 
 static void sc::boot::on_shutdown() {
     visor::gui::shutdown();
+    iracing::shutdown();
 }
