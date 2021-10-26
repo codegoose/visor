@@ -2,6 +2,10 @@
 
 #include <curl/curl.h>
 #include <curl/easy.h>
+#include <spdlog/spdlog.h>
+
+#include <mutex>
+#include <optional>
 
 #include <sstream>
 
@@ -16,9 +20,28 @@ static size_t curl_write_cb(void *incoming_buffer, size_t element_size, size_t n
     return num_bytes;
 }
 
+static std::optional<std::string> initialize_winsock() {
+    static std::mutex mutex;
+    std::lock_guard guard(mutex);
+    static WSADATA wsa_data;
+    static std::optional<bool> initialized;
+    if (initialized) {
+        if (*initialized) return std::nullopt;
+    } else {
+        if (WSAStartup(MAKEWORD(2, 2), &wsa_data) == 0) {
+            spdlog::debug("Initialized Windows sockets.");
+            initialized = true;
+            return std::nullopt;
+        }
+    }
+    return "Unable to initialize Windows sockets.";
+}
+
 tl::expected<nlohmann::json, std::string> eon::rest::post(const std::string_view &url, const nlohmann::json &post_data) {
+    if (const auto err = initialize_winsock(); err) return tl::make_unexpected(*err);
     std::vector<std::byte> buffer;
     auto curl = curl_easy_init();
+    if (!curl) return tl::make_unexpected("Unable to initialize.");
     DEFER(curl_easy_cleanup(curl));
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
     curl_easy_setopt(curl, CURLOPT_URL, url.data());
