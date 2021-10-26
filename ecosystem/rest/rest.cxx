@@ -58,7 +58,13 @@ tl::expected<nlohmann::json, std::string> eon::rest::post(const std::string_view
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data_str.data());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post_data_str.size());
-    if (auto curl_res = curl_easy_perform(curl); curl_res != CURLE_OK) return tl::make_unexpected("Unable to initiate request.");
+    if (auto curl_res = curl_easy_perform(curl); curl_res != CURLE_OK) {
+        std::stringstream ss;
+        ss << "Unable to initiate request. (Error #";
+        ss << curl_res;
+        ss << ")";
+        return tl::make_unexpected(ss.str());
+    }
     if (long code; curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code) != CURLE_OK || code != 200) {
         std::stringstream ss;
         ss << "HTTP error #";
