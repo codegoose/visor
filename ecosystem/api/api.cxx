@@ -18,7 +18,7 @@ std::shared_future<tl::expected<nlohmann::json, std::string>> sc::api::customer:
     doc["name"] = name.data();
     doc["password_hash"] = hash_password(password);
     return std::async(std::launch::async, [doc]() mutable -> tl::expected<nlohmann::json, std::string> {
-        return eon::rest::post("https://10.144.139.197/api/customers/create_new", doc);
+        return eon::rest::post("https://10.144.139.187/api/customers/create_new", doc);
     });
 }
 
@@ -27,6 +27,6 @@ std::shared_future<tl::expected<nlohmann::json, std::string>> sc::api::customer:
     doc["email"] = email.data();
     doc["password_hash"] = hash_password(password);
     return std::async(std::launch::async, [doc]() mutable -> tl::expected<nlohmann::json, std::string> {
-        return eon::rest::post("https://10.144.139.197/api/customers/get_session_token", doc);
+        return eon::rest::post("https://10.144.139.187/api/customers/get_session_token", doc);
     });
 }
