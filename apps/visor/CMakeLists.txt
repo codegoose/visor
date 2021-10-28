@@ -1,0 +1,39 @@
+add_executable(visor
+    "main.rc"
+    "main.cxx"
+    "application.cxx"
+    "gui.cxx"
+    "version.cxx"
+    "animation_instance.cxx"
+    "device_context.cxx"
+    "legacy.cxx"
+    "bezier.cxx"
+)
+
+target_link_libraries(visor
+    CONAN_PKG::glm
+    CONAN_PKG::spdlog
+    CONAN_PKG::fmt
+    CONAN_PKG::glfw
+    CONAN_PKG::glbinding
+    CONAN_PKG::imgui
+    CONAN_PKG::freetype
+    CONAN_PKG::pystring
+    CONAN_PKG::magic_enum
+
+    api
+    boot
+    imgui
+    hidhide
+    font
+    vigem
+    systray
+    sentry
+    texture
+    file
+    cimpl
+    firmware
+    iracing
+)
+
+win32_release_mode_no_console(visor)

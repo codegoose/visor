@@ -4,11 +4,44 @@
             "name": "Default",
             "cppStandard": "c++17",
             "includePath": [
-
-                "${workspaceFolder}/ecosystem/precompiled/rlottie/include"
+                "C:/Users/bwhit/.conan/data/stb/cci.20210713/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
+                "C:/Users/bwhit/.conan/data/tl-expected/20190710/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
+                "C:/Users/bwhit/.conan/data/sentry-native/0.4.12/_/_/package/24c3be4cc157b1197d7308580b22d9a0423b78e9/include",
+                "C:/Users/bwhit/.conan/data/freetype/2.10.4/_/_/package/c69bad48274e7fc45c887cddc32aa0459f0a81e0/include",
+                "C:/Users/bwhit/.conan/data/freetype/2.10.4/_/_/package/c69bad48274e7fc45c887cddc32aa0459f0a81e0/include/freetype2",
+                "C:/Users/bwhit/.conan/data/spdlog/1.9.2/_/_/package/fc6983b74772bc0fec6c8c5701962c5554112e61/include",
+                "C:/Users/bwhit/.conan/data/glfw/3.3.4/_/_/package/72e84aac9213a09dfb0f59578ae9423a2eb326e7/include",
+                "C:/Users/bwhit/.conan/data/glm/0.9.9.8/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
+                "C:/Users/bwhit/.conan/data/imgui/1.85/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
+                "C:/Users/bwhit/.conan/data/sol2/3.2.3/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
+                "C:/Users/bwhit/.conan/data/libcurl/7.79.1/_/_/package/e6b1d1798581c401d12ccd0480c8dbc037628902/include",
+                "C:/Users/bwhit/.conan/data/pystring/1.1.3/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
+                "C:/Users/bwhit/.conan/data/nlohmann_json/3.10.4/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
+                "C:/Users/bwhit/.conan/data/botan/2.18.1/_/_/package/7e19446dd3c76c76436f8c56f411c16d77d530cb/include/botan-2",
+                "C:/Users/bwhit/.conan/data/indicators/2.2/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
+                "C:/Users/bwhit/.conan/data/glbinding/3.1.0/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
+                "C:/Users/bwhit/.conan/data/yaml-cpp/0.7.0/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
+                "C:/Users/bwhit/.conan/data/magic_enum/0.7.3/_/_/package/5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9/include",
+                "C:/.conan/5c4344/1/include",
+                "C:/.conan/5c4344/1/include/crashpad/mini_chromium",
+                "C:/.conan/5c4344/1/include/crashpad",
+                "C:/Users/bwhit/.conan/data/libpng/1.6.37/_/_/package/8b1ef0ec9599374db4689199730c00a0d5f4de36/include",
+                "C:/Users/bwhit/.conan/data/bzip2/1.0.8/_/_/package/589a23dff5fdb23a7fb851223eb766480ead0a9a/include",
+                "C:/Users/bwhit/.conan/data/brotli/1.0.9/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
+                "C:/Users/bwhit/.conan/data/brotli/1.0.9/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include/brotli",
+                "C:/Users/bwhit/.conan/data/fmt/8.0.1/_/_/package/8ed2451fe8e6a2dd1b2f8bac3c035717ff9ddfa8/include",
+                "C:/Users/bwhit/.conan/data/lua/5.3.5/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
+                "C:/Users/bwhit/.conan/data/openssl/1.1.1l/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include",
+                "C:/Users/bwhit/.conan/data/zlib/1.2.11/_/_/package/d057732059ea44a47760900cb5e4855d2bea8714/include"
             ],
             "defines": [
-
+                "CURL_STATICLIB=1",
+                "IMGUI_USER_CONFIG=\"imgui_user_config.h\"",
+                "SPDLOG_COMPILED_LIB",
+                "SPDLOG_FMT_EXTERNAL",
+                "SENTRY_BUILD_STATIC",
+                "STB_TEXTEDIT_KEYTYPE=unsigned",
+                "_NOEXCEPT=noexcept"
             ]
         }
     ],

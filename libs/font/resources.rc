@@ -1,0 +1,3 @@
+FONT_DEFAULT DATA ".\\..\\..\\libs\\font\\resources\\seguisb.ttf"
+FONT_FA_SOLID DATA ".\\..\\..\\libs\\font\\resources\\fa-solid-900.ttf"
+FONT_FA_BRANDS DATA ".\\..\\..\\libs\\font\\resources\\fa-brands-400.ttf"

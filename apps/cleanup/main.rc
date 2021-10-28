@@ -1,0 +1,45 @@
+#if !defined(RC_INVOKED)
+#pragma once
+#endif
+
+#define VER_COMPANY_NAME "Sim Coaches LLC"
+#define VER_LEGAL_COPYRIGHT "Sim Coaches LLC (2021)"
+#define VER_APP_NAME "Cleanup"
+#define VER_APP_VER "1.0.0.0"
+#define VER_FILE_VER 1,0,0,0
+#define VER_APP_DESCRIPTION "Legacy software cleanup utility."
+
+#ifdef RC_INVOKED
+
+#include <windows.h>
+
+GLFW_ICON ICON "main.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION VER_FILE_VER
+PRODUCTVERSION VER_FILE_VER
+FILEFLAGSMASK 0x3fL
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+
+BEGIN
+BLOCK "StringFileInfo"
+BEGIN
+BLOCK "040904B0"
+BEGIN
+VALUE "CompanyName", VER_COMPANY_NAME
+VALUE "LegalCopyright", VER_LEGAL_COPYRIGHT
+VALUE "ProductName", VER_APP_NAME
+VALUE "ProductVersion", VER_APP_VER
+VALUE "FileVersion", VER_APP_VER
+VALUE "FileDescription", VER_APP_DESCRIPTION
+END
+END
+BLOCK "VarFileInfo"
+BEGIN
+VALUE "Translation", 0x409, 1200
+END
+END
+
+#endif

@@ -1,6 +1,4 @@
 .vscode/
 build/
 build_rel/
-old/
-installer/visor-cache/
-installer/bin/
+installer-cache/

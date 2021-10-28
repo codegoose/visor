@@ -1,0 +1,6 @@
+include_directories("${PROJECT_SOURCE_DIR}/precompiled/rlottie/include")
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    link_libraries("${PROJECT_SOURCE_DIR}/precompiled/rlottie/lib/Debug/rlottie.lib")
+else()
+    link_libraries("${PROJECT_SOURCE_DIR}/precompiled/rlottie/lib/RelWithDebInfo/rlottie.lib")
+endif()
