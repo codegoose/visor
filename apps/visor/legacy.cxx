@@ -10,6 +10,7 @@
 #include <Xinput.h>
 
 #include <GLFW/glfw3.h>
+#include <nlohmann/json.hpp>
 
 #include "../../libs/hidhide/hidhide.h"
 #include "../../libs/vigem/client.h"
@@ -17,6 +18,8 @@
 #include <glm/common.hpp>
 
 #include "bezier.h"
+
+#include "../../libs/file/file.h"
 
 #undef min
 #undef max
@@ -107,6 +110,8 @@ std::optional<std::string> sc::visor::legacy::enable() {
                     vigem_client = new_vigem_client;
                     vigem_gamepad = new_vigem_gamepad;
                     spdlog::debug("Legacy support enabled.");
+                    if (const auto err = load_settings(); err) spdlog::error("Unable to load legacy settings: {}", *err);
+                    else spdlog::debug("Loaded legacy settings");
                     return std::nullopt;
                 } else {
                     vigem_target_free(new_vigem_gamepad);
@@ -172,6 +177,14 @@ std::optional<std::string> sc::visor::legacy::process() {
             value -= min_input;
             value *= 1.f / (max_input - min_input);
             value = glm::min(1.f, glm::max(0.f, value));
+            if (axes[j].curve_i >= 0) {
+                std::vector<glm::dvec2> model;
+                for (auto &percent : legacy::models[axes[j].curve_i].points) model.push_back({
+                    static_cast<double>(percent.x) / 100.0,
+                    static_cast<double>(percent.y) / 100.0
+                });
+                value = bezier::calculate(model, value).y;
+            }
             value = glm::min(value, axes[j].output_limit / 100.f);
             if (j == 0) vigem_gamepad_report->bThumbLX = glm::round(255 * value);
             else if (j == 1) vigem_gamepad_report->bThumbLY = glm::round(255 * value);
@@ -192,4 +205,72 @@ std::optional<std::string> sc::visor::legacy::process() {
 
 bool sc::visor::legacy::present() {
     return axes.size() > 0;
+}
+
+std::optional<std::string> sc::visor::legacy::save_settings() {
+    nlohmann::json doc, axes_doc;
+    for (int i = 0; i < axes.size(); i++) {
+        nlohmann::json axis_doc;
+        axis_doc["min"] = axes[i].output_steps_min;
+        axis_doc["max"] = axes[i].output_steps_max;
+        axis_doc["deadzone"] = axes[i].deadzone;
+        axis_doc["limit"] = axes[i].output_limit;
+        if (axes[i].curve_i != -1) axis_doc["curve"] = axes[i].curve_i;
+        axes_doc.push_back(axis_doc);
+    }
+    doc["axes"] = axes_doc;
+    nlohmann::json models_doc;
+    for (int i = 0; i < models.size(); i++) {
+        nlohmann::json model_doc;
+        if (models[i].label) model_doc["label"] = *models[i].label;
+        nlohmann::json points_doc;
+        for (int j = 0; j < models[i].points.size(); j++) {
+            nlohmann::json point_doc = {
+                { "x", models[i].points[j].x },
+                { "y", models[i].points[j].y }
+            };
+            points_doc.push_back(point_doc);
+        }
+        model_doc["points"] = points_doc;
+        models_doc.push_back(model_doc);
+    }
+    doc["models"] = models_doc;
+    auto doc_content = doc.dump(4);
+    std::vector<std::byte> doc_data;
+    doc_data.resize(doc_content.size());
+    memcpy(doc_data.data(), doc_content.data(), glm::min(doc_data.size(), doc_content.size()));
+    if (const auto err = file::save("virtual-pedals.json", doc_data); err) return *err;
+    return std::nullopt;
+}
+
+std::optional<std::string> sc::visor::legacy::load_settings() {
+    const auto load_res = file::load("virtual-pedals.json");
+    if (!load_res.has_value()) return load_res.error();
+    auto doc = nlohmann::json::parse(*load_res);
+    if (auto axes_doc = doc.find("axes"); axes_doc != doc.end() && axes_doc->is_array()) {
+        for (int i = 0; i < glm::min(axes_doc->size(), axes.size()); i++) {
+            axes[i].output_steps_min = axes_doc->at(i).value("min", 0);
+            axes[i].output_steps_max = axes_doc->at(i).value("max", 100);
+            axes[i].deadzone = axes_doc->at(i).value("deadzone", 0);
+            axes[i].output_limit = axes_doc->at(i).value("limit", 100);
+            axes[i].curve_i = axes_doc->at(i).value("curve", -1);
+            axes[i].model_edit_i = axes[i].curve_i;
+        }
+    }
+    if (auto models_doc = doc.find("models"); models_doc != doc.end() && models_doc->is_array()) {
+        for (int i = 0; i < glm::min(models_doc->size(), models.size()); i++) {
+            auto model_doc = models_doc->at(i);
+            if (auto label = model_doc.find("label"); label != model_doc.end() && label->is_string()) {
+                models[i].label = *label;
+                strcpy_s(models[i].label_buffer.data(), models[i].label_buffer.size(), models[i].label->data());
+            }
+            if (auto points_doc = model_doc.find("points"); points_doc->is_array()) {
+                for (int j = 0; j < points_doc->size(); j++) {
+                    models[i].points[j].x = points_doc->at(j).value("x", 0);
+                    models[i].points[j].y = points_doc->at(j).value("y", 0);
+                }
+            }
+        }
+    }
+    return std::nullopt;
 }

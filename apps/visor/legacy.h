@@ -20,6 +20,8 @@ namespace sc::visor::legacy {
         int output_short = 0;
         int deadzone = 0;
         int output_limit = 100;
+        int model_edit_i = -1;
+        int curve_i = -1;
     };
 
     struct model {
@@ -48,4 +50,7 @@ namespace sc::visor::legacy {
     void disable();
     std::optional<std::string> process();
     bool present();
+
+    std::optional<std::string> load_settings();
+    std::optional<std::string> save_settings();
 }

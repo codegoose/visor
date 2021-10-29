@@ -39,6 +39,7 @@ namespace sc::visor::gui {
     static std::vector<std::shared_ptr<firmware::mk4::device_handle>> devices;
     static std::vector<std::shared_ptr<device_context>> device_contexts;
 
+    static bool legacy_is_default = true;
     static bool enable_legacy_support = false;
 
     static std::array<char, 92> account_email_input_buffer = { 0 };
@@ -520,7 +521,9 @@ namespace sc::visor::gui {
                                     ImGui::EndMenuBar();
                                 }
                                 if (ImGui::Button(fmt::format("{} Save Settings", ICON_FA_FILE_IMPORT).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
-
+                                    if (const auto err = legacy::save_settings(); err) {
+                                        spdlog::error("Unable to save settings: {}", *err);
+                                    } else spdlog::info("Settings saved.");
                                 }
                                 if (ImGui::Button(fmt::format("{} Clear Settings", ICON_FA_ERASER).data(), { ImGui::GetContentRegionAvail().x, 0 }));
                             }
@@ -619,6 +622,72 @@ namespace sc::visor::gui {
                                     }
                                 }
                                 ImGui::EndChild();
+                                if (ImGui::BeginChild(fmt::format("##Axis{}CurveWindow", current_selection).data(), { 0, 0 }, true, ImGuiWindowFlags_MenuBar)) {
+                                    if (ImGui::BeginMenuBar()) {
+                                        ImGui::Text(fmt::format("{} Curve", ICON_FA_BEZIER_CURVE).data());
+                                        ImGui::EndMenuBar();
+                                    }
+                                    const std::string selected_model_label = legacy::axes[current_selection].model_edit_i >= 0 ? (legacy::models[legacy::axes[current_selection].model_edit_i].label ? fmt::format("{} (#{})", *legacy::models[legacy::axes[current_selection].model_edit_i].label, legacy::axes[current_selection].model_edit_i) : fmt::format("Model #{}", legacy::axes[current_selection].model_edit_i)) : "None selected.";
+                                    if (ImGui::BeginCombo(fmt::format("##Axis{}CurveOptions", current_selection).data(), selected_model_label.data())) {
+                                        for (int model_i = 0; model_i < legacy::models.size(); model_i++) {
+                                            std::string this_label = legacy::models[model_i].label ? fmt::format("{} (#{})", *legacy::models[model_i].label, model_i) : fmt::format("Model #{}", model_i);
+                                            if (model_i == legacy::axes[current_selection].curve_i) this_label += " *";
+                                            if (ImGui::Selectable(this_label.data())) legacy::axes[current_selection].model_edit_i = model_i;
+                                        }
+                                        ImGui::EndCombo();
+                                    }
+                                    ImGui::SameLine();
+                                    ImGui::Text("Curve Model");
+                                    if (legacy::axes[current_selection].model_edit_i >= 0) {
+                                        ImGui::InputText("", legacy::models[legacy::axes[current_selection].model_edit_i].label_buffer.data(), legacy::models[legacy::axes[current_selection].model_edit_i].label_buffer.size());
+                                        ImGui::SameLine();
+                                        if (ImGui::Button("Set Label", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            legacy::models[legacy::axes[current_selection].model_edit_i].label = legacy::models[legacy::axes[current_selection].model_edit_i].label_buffer.data();
+                                        }
+                                        {
+                                            std::vector<glm::dvec2> model;
+                                            for (auto &percent : legacy::models[legacy::axes[current_selection].model_edit_i].points) model.push_back({
+                                                static_cast<double>(percent.x) / 100.0,
+                                                static_cast<double>(percent.y) / 100.0
+                                            });
+                                            const int deadzone_padding = (legacy::axes[current_selection].deadzone / 100.f) * static_cast<float>(legacy::axes[current_selection].output_steps_max - legacy::axes[current_selection].output_steps_min);
+                                            auto cif = glm::max(0.0, static_cast<double>(legacy::axes[current_selection].input_steps - (legacy::axes[current_selection].output_steps_min + deadzone_padding)) / static_cast<double>(legacy::axes[current_selection].output_steps_max - (legacy::axes[current_selection].output_steps_min + deadzone_padding)));
+                                            if (cif > 1.0) cif = 1.0;
+                                            if (legacy::axes[current_selection].model_edit_i == legacy::axes[current_selection].curve_i) bezier::ui::plot_cubic(model, { 200, 200 }, legacy::axes[current_selection].output, std::nullopt, legacy::axes[current_selection].output_limit / 100.f, cif);
+                                            else bezier::ui::plot_cubic(model, { 200, 200 }, std::nullopt, std::nullopt, legacy::axes[current_selection].output_limit / 100.f, cif);
+                                        }
+                                        ImGui::SameLine();
+                                        if (ImGui::BeginChild(fmt::format("##Axis{}CurveWindowRightPanel", current_selection).data(), { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y }, false)) {
+                                            ImGui::PushItemWidth(80);
+                                            for (int i = 0; i < legacy::models[legacy::axes[current_selection].model_edit_i].points.size(); i++) {
+                                                if (i == 0 || i == legacy::models[legacy::axes[current_selection].model_edit_i].points.size() - 1) continue;
+                                                switch (i) {
+                                                    case 1: ImGui::TextDisabled("20%%"); break;
+                                                    case 2: ImGui::TextDisabled("40%%"); break;
+                                                    case 3: ImGui::TextDisabled("60%%"); break;
+                                                    case 4: ImGui::TextDisabled("80%%"); break;
+                                                    default: break;
+                                                }
+                                                ImGui::SameLine();
+                                                if (ImGui::Button(fmt::format("{}##YM{}", ICON_FA_MINUS, i + 1).data()) && legacy::models[legacy::axes[current_selection].model_edit_i].points[i].y > 0) {
+                                                    legacy::models[legacy::axes[current_selection].model_edit_i].points[i].y--;
+                                                }
+                                                ImGui::SameLine();
+                                                if (ImGui::Button(fmt::format("{}##YP{}", ICON_FA_PLUS, i + 1).data()) && legacy::models[legacy::axes[current_selection].model_edit_i].points[i].y < 100) {
+                                                    legacy::models[legacy::axes[current_selection].model_edit_i].points[i].y++;
+                                                }
+                                                ImGui::SameLine();
+                                                if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &legacy::models[legacy::axes[current_selection].model_edit_i].points[i].y, 0, 100));
+                                            }
+                                            ImGui::PopItemWidth();
+                                            if (legacy::axes[current_selection].curve_i != legacy::axes[current_selection].model_edit_i && ImGui::Button("Make Active", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                                legacy::axes[current_selection].curve_i = legacy::axes[current_selection].model_edit_i;
+                                            }
+                                        }
+                                        ImGui::EndChild();
+                                    }
+                                }
+                                ImGui::EndChild();
                             }
                             ImGui::EndChild();
                             // !!!
@@ -656,6 +725,16 @@ namespace sc::visor::gui {
         emit_content_device_panel();
     }
 
+    static void try_toggle_legacy_support() {
+        if (enable_legacy_support) {
+            legacy::disable();
+            enable_legacy_support = false;
+        } else if (const auto err = legacy::enable(); err) {
+            legacy_support_error = true;
+            legacy_support_error_description = *err;
+        } else enable_legacy_support = true;
+    }
+
     static void emit_primary_window_menu_bar() {
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu(fmt::format("{} File", ICON_FA_SAVE).data())) {
@@ -664,22 +743,18 @@ namespace sc::visor::gui {
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(fmt::format("{} System", ICON_FA_CALCULATOR).data())) {
-                if (devices.size() || device_contexts.size()) {
-                    for (auto &device : devices) ImGui::TextDisabled(fmt::format("{} {} {} (#{})", ICON_FA_MICROCHIP, device->org, device->name, device->serial).data());
-                    ImGui::Selectable(fmt::format("{} Clear Axis Calibrations", ICON_FA_ERASER).data());
-                    if (ImGui::Selectable(fmt::format("{} Release Hardware", ICON_FA_STOP).data())) {
-                        devices.clear();
-                        device_contexts.clear();
-                    }
-                } else ImGui::TextDisabled("No devices.");
-                if (ImGui::Selectable(fmt::format("{} {} Legacy Support", ICON_FA_RECYCLE, enable_legacy_support ? "Disable" : "Enable").data())) {
-                    if (enable_legacy_support) {
-                        legacy::disable();
-                        enable_legacy_support = false;
-                    } else if (const auto err = legacy::enable(); err) {
-                        legacy_support_error = true;
-                        legacy_support_error_description = *err;
-                    } else enable_legacy_support = true;
+                if (!legacy_is_default) {
+                    if (devices.size() || device_contexts.size()) {
+                        for (auto &device : devices) ImGui::TextDisabled(fmt::format("{} {} {} (#{})", ICON_FA_MICROCHIP, device->org, device->name, device->serial).data());
+                        if (ImGui::Selectable(fmt::format("{} Release Hardware", ICON_FA_STOP).data())) {
+                            devices.clear();
+                            device_contexts.clear();
+                        }
+                    } else ImGui::TextDisabled("No devices.");
+                }
+                ImGui::Selectable(fmt::format("{} Clear System Calibrations", ICON_FA_ERASER).data());
+                if (!legacy_is_default && ImGui::Selectable(fmt::format("{} {} Legacy Support", ICON_FA_RECYCLE, enable_legacy_support ? "Disable" : "Enable").data())) {
+                    try_toggle_legacy_support();
                 }
                 ImGui::EndMenu();
             }
@@ -700,8 +775,11 @@ namespace sc::visor::gui {
         ImGui::SetNextWindowSize({ 400, 200 }, ImGuiCond_Always);
         // ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 12, 12 });
         ImGui::PushStyleColor(ImGuiCol_TitleBgActive, { 90.f / 255.f, 12.f / 255.f, 12.f / 255.f, 1.f });
-        if (ImGui::BeginPopupModal("Legacy Hardware Enablement Error", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
-            ImGui::TextWrapped("Legacy hardware support was unable to be activated. There are additional drivers required for this functionality. Make sure they're installed.");
+        if (ImGui::BeginPopupModal(legacy_is_default ? "Hardware Enablement Error" : "Legacy Hardware Enablement Error", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+            ImGui::TextWrapped(fmt::format(
+                "{} support was unable to be activated. There are additional drivers required for this functionality. Make sure they're installed.",
+                legacy_is_default ? "Hardware" : "Legacy hardware"
+            ).data());
             ImGui::NewLine();
             {
                 const auto old_y = ImGui::GetCursorPos().y;
@@ -730,6 +808,7 @@ void sc::visor::gui::initialize() {
     load_animations();
     animation_scan.loop = true;
     animation_comm.loop = true;
+    if (legacy_is_default) try_toggle_legacy_support();
 }
 
 void sc::visor::gui::shutdown() {
@@ -750,10 +829,11 @@ void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size, bool *const force_
         emit_content_panel();
     }
     ImGui::End();
+    emit_legacy_hardware_enablement_error_popup(framebuffer_size);
     if (legacy_support_error) {
-        ImGui::OpenPopup("Legacy Hardware Enablement Error");
+        spdlog::error("Legacy support experienced an error.");
+        ImGui::OpenPopup(legacy_is_default ? "Hardware Enablement Error" : "Legacy Hardware Enablement Error");
         legacy_support_error = false;
     }
-    emit_legacy_hardware_enablement_error_popup(framebuffer_size);
     poll_devices();
 }
