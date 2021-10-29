@@ -18,7 +18,7 @@ sc::api::response sc::api::customer::create_new(const std::string_view &email, c
     doc["name"] = name.data();
     doc["password_hash"] = hash_password(password);
     return std::async(std::launch::async, [doc]() mutable -> tl::expected<nlohmann::json, std::string> {
-        return eon::rest::post("https://10.144.139.187/api/customers/create_new", doc);
+        return eon::rest::post("http://simcoaches.io/api/customers/create_new", doc);
     });
 }
 
@@ -27,6 +27,6 @@ sc::api::response sc::api::customer::get_session_token(const std::string_view &e
     doc["email"] = email.data();
     doc["password_hash"] = hash_password(password);
     return std::async(std::launch::async, [doc]() mutable -> tl::expected<nlohmann::json, std::string> {
-        return eon::rest::post("https://10.144.139.187/api/customers/get_session_token", doc);
+        return eon::rest::post("http://simcoaches.io/api/customers/get_session_token", doc);
     });
 }
