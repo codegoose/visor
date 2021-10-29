@@ -547,6 +547,7 @@ namespace sc::visor::gui {
                                     }
                                     if (ImGui::Button(fmt::format("Axis #{}", i + 1).data(), { ImGui::GetContentRegionAvail().x, 40 })) current_selection = i;
                                     ImGui::PopStyleColor(3);
+                                    ImGui::ProgressBar(legacy::axes[i].output, { ImGui::GetContentRegionAvail().x, 8 }, "");
                                 }
                             }
                             ImGui::EndChild();
