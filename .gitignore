@@ -2,3 +2,4 @@
 build/
 build_rel/
 installer-cache/
+bin/
