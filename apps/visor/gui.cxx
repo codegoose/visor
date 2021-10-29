@@ -42,6 +42,8 @@ namespace sc::visor::gui {
     static bool legacy_is_default = true;
     static bool enable_legacy_support = false;
 
+    static std::optional<std::string> account_session_token;
+    static std::optional<std::string> account_person_name;
     static std::array<char, 92> account_email_input_buffer = { 0 };
     static std::array<char, 92> account_password_input_buffer = { 0 };
     static std::array<char, 92> account_name_input_buffer = { 0 };
@@ -331,108 +333,128 @@ namespace sc::visor::gui {
     static void emit_content_device_panel() {
         if (ImGui::BeginTabBar("##AppModeBar")) {
             if (ImGui::BeginTabItem(fmt::format("{} Account", ICON_FA_USER).data())) {
-                ImPenUtility pen;
-                pen.CalculateWindowBounds();
-                ImGui::SetCursorPos(pen.GetCenteredPosition({ 300, 400 }));
-                if (ImGui::BeginChild("AccountEnablementChild", { 300, 400 }, true, ImGuiWindowFlags_NoScrollbar)) {
-                    if (ImGui::BeginTabBar("##AccountEnablementTabBar")) {
-                        auto flags = (account_creation_response || account_login_response) ? ImGuiInputTextFlags_ReadOnly : 0;
-                        if (ImGui::BeginTabItem("Login")) {
-                            if (account_login_response) {
-                                animation_scan.play = true;
-                                ImPenUtility pen;
-                                pen.CalculateWindowBounds();
-                                const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
-                                ImGui::SetCursorScreenPos(image_pos);
-                                if (animation_scan.frames.size()) {
-                                    ImGui::Image(
-                                        reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
-                                        GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
-                                        { 0, 0 },
-                                        { 1, 1 },
-                                        { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
-                                    );
-                                }
-                                if (account_login_response->valid()) {
-                                    if (const auto status = account_login_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
-                                        const auto response = account_login_response->get();
-                                        if (response.has_value()) {
-                                            spdlog::debug(response->dump());
-                                            
-                                        } else {
-                                            spdlog::error("Unable to login: {}", response.error());
-                                            account_creation_error = response.error();
-                                        }
-                                        account_login_response.reset();
+                if (!account_session_token) {
+                    ImPenUtility pen;
+                    pen.CalculateWindowBounds();
+                    ImGui::SetCursorPos(pen.GetCenteredPosition({ 300, 400 }));
+                    if (ImGui::BeginChild("AccountEnablementChild", { 300, 400 }, true, ImGuiWindowFlags_NoScrollbar)) {
+                        if (ImGui::BeginTabBar("##AccountEnablementTabBar")) {
+                            auto flags = (account_creation_response || account_login_response) ? ImGuiInputTextFlags_ReadOnly : 0;
+                            if (ImGui::BeginTabItem("Login")) {
+                                if (account_login_response) {
+                                    animation_scan.play = true;
+                                    ImPenUtility pen;
+                                    pen.CalculateWindowBounds();
+                                    const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
+                                    ImGui::SetCursorScreenPos(image_pos);
+                                    if (animation_scan.frames.size()) {
+                                        ImGui::Image(
+                                            reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
+                                            GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
+                                            { 0, 0 },
+                                            { 1, 1 },
+                                            { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
+                                        );
                                     }
-                                }
-                            } else {
-                                ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
-                                ImGui::InputTextWithHint("##AccountEnablementEmailInput", "email", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
-                                ImGui::InputTextWithHint("##AccountEnablementPasswordInput", "password", account_password_input_buffer.data(), account_password_input_buffer.size(), flags);
-                                ImGui::PopItemWidth();
-                                if (ImGui::Button("Login", { ImGui::GetContentRegionAvail().x, 0 })) {
-                                    spdlog::debug("Starting login attempt now.");
-                                    account_login_response = api::customer::get_session_token(
-                                        account_email_input_buffer.data(),
-                                        account_password_input_buffer.data()
-                                    );
-                                    animation_scan.frame_i = 0;
-                                }
-                            }
-                            ImGui::EndTabItem();
-                        }
-                        if (ImGui::BeginTabItem("Create New")) {
-                            if (account_creation_response) {
-                                animation_scan.play = true;
-                                ImPenUtility pen;
-                                pen.CalculateWindowBounds();
-                                const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
-                                ImGui::SetCursorScreenPos(image_pos);
-                                if (animation_scan.frames.size()) {
-                                    ImGui::Image(
-                                        reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
-                                        GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
-                                        { 0, 0 },
-                                        { 1, 1 },
-                                        { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
-                                    );
-                                }
-                                if (account_creation_response->valid()) {
-                                    if (const auto status = account_creation_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
-                                        const auto response = account_creation_response->get();
-                                        if (response.has_value()) {
-                                            spdlog::debug(response->dump());
-                                            
-                                        } else {
-                                            spdlog::error("Unable to create account: {}", response.error());
-                                            account_creation_error = response.error();
+                                    if (account_login_response->valid()) {
+                                        if (const auto status = account_login_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
+                                            const auto response = account_login_response->get();
+                                            if (response.has_value()) {
+                                                if (response->value("error", false)) account_login_error = response->value("message", "Unknown error.");
+                                                else {
+                                                    if (response->find("session_token") != response->end()) {
+                                                        account_session_token = response.value()["session_token"];
+                                                        account_person_name = response.value()["name"];
+                                                        account_login_error.reset();
+                                                    } else account_login_error = "No session token received.";
+                                                }
+                                            } else {
+                                                spdlog::error("Unable to login: {}", response.error());
+                                                account_login_error = response.error();
+                                            }
+                                            account_login_response.reset();
                                         }
-                                        account_creation_response.reset();
                                     }
+                                } else {
+                                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+                                    ImGui::InputTextWithHint("##AccountEnablementEmailInput", "email", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
+                                    ImGui::InputTextWithHint("##AccountEnablementPasswordInput", "password", account_password_input_buffer.data(), account_password_input_buffer.size(), flags | ImGuiInputTextFlags_Password);
+                                    ImGui::PopItemWidth();
+                                    if (ImGui::Button("Login", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                        spdlog::debug("Starting login attempt now.");
+                                        account_login_response = api::customer::get_session_token(
+                                            account_email_input_buffer.data(),
+                                            account_password_input_buffer.data()
+                                        );
+                                        animation_scan.frame_i = 0;
+                                    }
+                                    if (account_login_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_login_error->data());
                                 }
-                            } else {
-                                ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
-                                ImGui::InputTextWithHint("##AccountEnablementNameInput", "name", account_name_input_buffer.data(), account_name_input_buffer.size(), flags);
-                                ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
-                                ImGui::InputTextWithHint("##AccountEnablementPasswordInput", "password", account_password_input_buffer.data(), account_password_input_buffer.size(), flags);
-                                ImGui::PopItemWidth();
-                                if (ImGui::Button("Create Account", { ImGui::GetContentRegionAvail().x, 0 })) {
-                                    spdlog::debug("Starting account creation attempt now.");
-                                    account_creation_response = api::customer::create_new(
-                                        account_email_input_buffer.data(),
-                                        account_name_input_buffer.data(),
-                                        account_password_input_buffer.data()
-                                    );
-                                    animation_scan.frame_i = 0;
-                                }
+                                ImGui::EndTabItem();
                             }
-                            ImGui::EndTabItem();
+                            if (ImGui::BeginTabItem("Create New")) {
+                                if (account_creation_response) {
+                                    animation_scan.play = true;
+                                    ImPenUtility pen;
+                                    pen.CalculateWindowBounds();
+                                    const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
+                                    ImGui::SetCursorScreenPos(image_pos);
+                                    if (animation_scan.frames.size()) {
+                                        ImGui::Image(
+                                            reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
+                                            GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
+                                            { 0, 0 },
+                                            { 1, 1 },
+                                            { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
+                                        );
+                                    }
+                                    if (account_creation_response->valid()) {
+                                        if (const auto status = account_creation_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
+                                            const auto response = account_creation_response->get();
+                                            if (response.has_value()) {
+                                                if (response->value("error", false)) account_creation_error = response->value("message", "Unknown error.");
+                                                else {
+                                                    if (response->find("session_token") != response->end()) {
+                                                        account_session_token = response.value()["session_token"];
+                                                        account_person_name = response.value()["name"];
+                                                        account_creation_error.reset();
+                                                    } else account_creation_error = "No session token received.";
+                                                }
+                                            } else {
+                                                spdlog::error("Unable to create account: {}", response.error());
+                                                account_creation_error = response.error();
+                                            }
+                                            account_creation_response.reset();
+                                        }
+                                    }
+                                } else {
+                                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+                                    ImGui::InputTextWithHint("##AccountEnablementNameInput", "name", account_name_input_buffer.data(), account_name_input_buffer.size(), flags);
+                                    ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
+                                    ImGui::InputTextWithHint("##AccountEnablementPasswordInput", "password", account_password_input_buffer.data(), account_password_input_buffer.size(), flags | ImGuiInputTextFlags_Password);
+                                    ImGui::PopItemWidth();
+                                    if (ImGui::Button("Create Account", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                        spdlog::debug("Starting account creation attempt now.");
+                                        account_creation_response = api::customer::create_new(
+                                            account_email_input_buffer.data(),
+                                            account_name_input_buffer.data(),
+                                            account_password_input_buffer.data()
+                                        );
+                                        animation_scan.frame_i = 0;
+                                    }
+                                    if (account_creation_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_creation_error->data());
+                                }
+                                ImGui::EndTabItem();
+                            }
+                            ImGui::EndTabBar();
                         }
-                        ImGui::EndTabBar();
                     }
+                    ImGui::EndChild();
+                } else {
+                    ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Logged In", ICON_FA_CHECK_DOUBLE).data());
+                    ImGui::SameLine();
+                    ImGui::TextDisabled(fmt::format("({}, Token: {})", *account_person_name, *account_session_token).data());
                 }
-                ImGui::EndChild();
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem(fmt::format("{} Hardware", ICON_FA_TOOLS).data())) {
