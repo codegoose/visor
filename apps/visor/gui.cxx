@@ -102,15 +102,43 @@ namespace sc::visor::gui {
     static bool legacy_is_default = true;
     static bool enable_legacy_support = false;
 
+    static bool should_verify_session_token = false;
     static std::optional<std::string> account_session_token;
     static std::optional<std::string> account_person_name;
+    static std::optional<std::string> account_email;
     static std::array<char, 92> account_email_input_buffer = { 0 };
     static std::array<char, 92> account_password_input_buffer = { 0 };
     static std::array<char, 92> account_name_input_buffer = { 0 };
+    static std::array<char, 92> account_code_input_buffer = { 0 };
     static std::optional<api::response> account_creation_response;
     static std::optional<std::string> account_creation_error;
     static std::optional<api::response> account_login_response;
     static std::optional<std::string> account_login_error;
+    static std::optional<api::response> account_confirmation_response;
+    static std::optional<std::string> account_confirmation_error;
+    static std::optional<api::response> account_pw_reset_response;
+    static std::optional<std::string> account_pw_reset_error;
+    static std::optional<api::response> account_pw_reset_confirm_response;
+    static std::optional<std::string> account_pw_reset_confirm_error;
+    static bool account_remember_me = false;
+    static bool account_pw_reset_awaits = false;
+
+    static std::optional<std::string> cfg_load() {
+        const auto load_res = file::load("settings.json");
+        if (!load_res.has_value()) return load_res.error();
+        cfg = nlohmann::json::parse(*load_res);
+        if (cfg.is_null()) cfg = nlohmann::json::object();
+        return std::nullopt;
+    }
+
+    static std::optional<std::string> cfg_save() {
+        auto doc_content = cfg.dump(4);
+        std::vector<std::byte> doc_data;
+        doc_data.resize(doc_content.size());
+        memcpy(doc_data.data(), doc_content.data(), glm::min(doc_data.size(), doc_content.size()));
+        if (const auto err = file::save("settings.json", doc_data); err) return *err;
+        return std::nullopt;
+    }
 
     static void prepare_styling_colors(ImGuiStyle &style) {
         style.Colors[ImGuiCol_Tab] = { 50.f / 255.f, 50.f / 255.f, 50.f / 255.f, 1.f };
@@ -391,15 +419,24 @@ namespace sc::visor::gui {
     }
 
     static void emit_content_device_panel() {
+        animation_under_construction.play = false;
+        animation_under_construction.playing = false;
         if (ImGui::BeginTabBar("##AppModeBar")) {
             if (ImGui::BeginTabItem(fmt::format("{} Account", ICON_FA_USER).data())) {
-                if (!account_session_token) {
+                static bool logged_in = false;
+                const auto logged_in_rn = !account_session_token || account_creation_response || account_login_response || account_confirmation_response || account_pw_reset_response || account_pw_reset_confirm_response;
+                if (logged_in_rn != logged_in) {
+                    spdlog::debug("Login state change: Saving");
+                    cfg_save();
+                    logged_in = logged_in_rn;
+                }
+                if (logged_in_rn) {
                     ImPenUtility pen;
                     pen.CalculateWindowBounds();
                     ImGui::SetCursorPos(pen.GetCenteredPosition({ 300, 400 }));
                     if (ImGui::BeginChild("AccountEnablementChild", { 300, 400 }, true, ImGuiWindowFlags_NoScrollbar)) {
                         if (ImGui::BeginTabBar("##AccountEnablementTabBar")) {
-                            auto flags = (account_creation_response || account_login_response) ? ImGuiInputTextFlags_ReadOnly : 0;
+                            auto flags = (account_creation_response || account_login_response || account_confirmation_response || account_pw_reset_response || account_pw_reset_confirm_response) ? ImGuiInputTextFlags_ReadOnly : 0;
                             if (ImGui::BeginTabItem("Login")) {
                                 if (account_login_response) {
                                     animation_scan.play = true;
@@ -420,16 +457,26 @@ namespace sc::visor::gui {
                                         if (const auto status = account_login_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
                                             const auto response = account_login_response->get();
                                             if (response.has_value()) {
-                                                if (response->value("error", false)) account_login_error = response->value("message", "Unknown error.");
-                                                else {
+                                                if (response->value("error", false)) {
+                                                    account_login_error = response->value("message", "Unknown error.");
+                                                    account_session_token.reset();
+                                                    account_person_name.reset();
+                                                    account_email.reset();
+                                                } else if (!account_session_token) {
                                                     if (response->find("session_token") != response->end()) {
                                                         account_session_token = response.value()["session_token"];
                                                         account_person_name = response.value()["name"];
+                                                        if (account_remember_me) {
+                                                            cfg["session_email"] = account_email_input_buffer.data();
+                                                            cfg["session_token"] = *account_session_token;
+                                                            cfg["session_person_name"] = *account_person_name;
+                                                        }
                                                         account_login_error.reset();
                                                     } else account_login_error = "No session token received.";
                                                 }
                                             } else {
                                                 spdlog::error("Unable to login: {}", response.error());
+                                                account_session_token.reset();
                                                 account_login_error = response.error();
                                             }
                                             account_login_response.reset();
@@ -448,6 +495,7 @@ namespace sc::visor::gui {
                                         );
                                         animation_scan.frame_i = 0;
                                     }
+                                    if (ImGui::Checkbox("Remember me", &account_remember_me));
                                     if (account_login_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_login_error->data());
                                 }
                                 ImGui::EndTabItem();
@@ -477,8 +525,14 @@ namespace sc::visor::gui {
                                                     if (response->find("session_token") != response->end()) {
                                                         account_session_token = response.value()["session_token"];
                                                         account_person_name = response.value()["name"];
+                                                        if (account_remember_me) {
+                                                            cfg["session_email"] = account_email_input_buffer.data();
+                                                            cfg["session_token"] = *account_session_token;
+                                                            cfg["session_person_name"] = *account_person_name;
+                                                        }
                                                         account_creation_error.reset();
-                                                    } else account_creation_error = "No session token received.";
+                                                    } else account_creation_error = response->value("message", "An error occurred.");
+                                                    
                                                 }
                                             } else {
                                                 spdlog::error("Unable to create account: {}", response.error());
@@ -503,6 +557,132 @@ namespace sc::visor::gui {
                                         animation_scan.frame_i = 0;
                                     }
                                     if (account_creation_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_creation_error->data());
+                                }
+                                ImGui::EndTabItem();
+                            }
+                            if (ImGui::BeginTabItem("Activate")) {
+                                if (account_confirmation_response) {
+                                    animation_scan.play = true;
+                                    ImPenUtility pen;
+                                    pen.CalculateWindowBounds();
+                                    const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
+                                    ImGui::SetCursorScreenPos(image_pos);
+                                    if (animation_scan.frames.size()) {
+                                        ImGui::Image(
+                                            reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
+                                            GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
+                                            { 0, 0 },
+                                            { 1, 1 },
+                                            { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
+                                        );
+                                    }
+                                    if (account_confirmation_response->valid()) {
+                                        if (const auto status = account_confirmation_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
+                                            const auto response = account_confirmation_response->get();
+                                            if (response.has_value()) {
+                                                account_confirmation_error = response->value("message", "An error occurred.");
+                                            } else {
+                                                spdlog::error("Unable to activate account: {}", response.error());
+                                                account_confirmation_error = response.error();
+                                            }
+                                            account_confirmation_response.reset();
+                                        }
+                                    }
+                                } else {
+                                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+                                    ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
+                                    ImGui::InputTextWithHint("##AccountEnablementPinInput", "code", account_code_input_buffer.data(), account_code_input_buffer.size(), flags);
+                                    ImGui::PopItemWidth();
+                                    if (ImGui::Button("Activate Account", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                        spdlog::debug("Starting account activation attempt now.");
+                                        account_confirmation_response = api::customer::activate_account(
+                                            account_email_input_buffer.data(),
+                                            account_code_input_buffer.data()
+                                        );
+                                        animation_scan.frame_i = 0;
+                                    }
+                                    if (account_confirmation_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_confirmation_error->data());
+                                }
+                                ImGui::EndTabItem();
+                            }
+                            if (ImGui::BeginTabItem("Reset Password")) {
+                                if (account_pw_reset_response || account_pw_reset_confirm_response) {
+                                    animation_scan.play = true;
+                                    ImPenUtility pen;
+                                    pen.CalculateWindowBounds();
+                                    const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size));
+                                    ImGui::SetCursorScreenPos(image_pos);
+                                    if (animation_scan.frames.size()) {
+                                        ImGui::Image(
+                                            reinterpret_cast<ImTextureID>(animation_scan.frames[animation_scan.frame_i]->handle),
+                                            GLMD_IM2(animation_scan.frames[animation_scan.frame_i]->size),
+                                            { 0, 0 },
+                                            { 1, 1 },
+                                            { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
+                                        );
+                                    }
+                                    if (account_pw_reset_response && account_pw_reset_response->valid()) {
+                                        if (const auto status = account_pw_reset_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
+                                            const auto response = account_pw_reset_response->get();
+                                            if (response.has_value()) {
+                                                account_pw_reset_error = response->value("message", "An error occurred.");
+                                                if (!response->value("error", true)) account_pw_reset_awaits = true;
+                                            } else {
+                                                spdlog::error("Unable to reset password: {}", response.error());
+                                                account_pw_reset_error = response.error();
+                                            }
+                                            account_pw_reset_response.reset();
+                                        }
+                                    }
+                                    if (account_pw_reset_confirm_response && account_pw_reset_confirm_response->valid()) {
+                                        if (const auto status = account_pw_reset_confirm_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
+                                            const auto response = account_pw_reset_confirm_response->get();
+                                            if (response.has_value()) {
+                                                account_pw_reset_confirm_error = response->value("message", "An error occurred.");
+                                                if (response->value("error", true)) {
+                                                    account_pw_reset_awaits = true;
+                                                }
+                                            } else {
+                                                spdlog::error("Unable to reset password: {}", response.error());
+                                                account_pw_reset_confirm_error = response.error();
+                                            }
+                                            account_pw_reset_confirm_response.reset();
+                                        }
+                                    }
+                                } else {
+                                    if (account_pw_reset_awaits) {
+                                        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+                                        ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
+                                        ImGui::InputTextWithHint("##AccountEnablementPinInput", "code", account_code_input_buffer.data(), account_code_input_buffer.size(), flags);
+                                        ImGui::InputTextWithHint("##AccountEnablementPasswordInput", "password", account_password_input_buffer.data(), account_password_input_buffer.size(), flags | ImGuiInputTextFlags_Password);
+                                        ImGui::PopItemWidth();
+                                        if (ImGui::Button("Submit", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            account_pw_reset_confirm_response = api::customer::password_reset(
+                                                account_email_input_buffer.data(),
+                                                account_code_input_buffer.data(),
+                                                account_password_input_buffer.data()
+                                            );
+                                        }
+                                        if (ImGui::Button("Request New Code", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            account_pw_reset_awaits = false;
+                                            account_pw_reset_error.reset();
+                                            account_pw_reset_confirm_error.reset();
+                                        }
+                                        if (account_pw_reset_confirm_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_pw_reset_confirm_error->data());
+                                    } else {
+                                        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+                                        ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
+                                        ImGui::PopItemWidth();
+                                        if (ImGui::Button("Send Reset Code", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            account_pw_reset_response = api::customer::request_password_reset(account_email_input_buffer.data());
+                                        }
+                                        if (ImGui::Button("Use Existing Code", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            account_pw_reset_awaits = true;
+                                            account_pw_reset_error.reset();
+                                            account_pw_reset_confirm_error.reset();
+                                        }
+                                        if (account_pw_reset_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_pw_reset_error->data());
+                                    }
                                 }
                                 ImGui::EndTabItem();
                             }
@@ -821,10 +1001,20 @@ namespace sc::visor::gui {
     static void emit_primary_window_menu_bar() {
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu(fmt::format("{} File", ICON_FA_SAVE).data())) {
-                if (ImGui::Selectable(fmt::format("{} Theme", ICON_FA_PAINT_ROLLER).data()));
+                if (account_session_token && ImGui::Selectable(fmt::format("{} Logout", ICON_FA_UNDO).data())) {
+                    account_email.reset();
+                    account_session_token.reset();
+                    account_person_name.reset();
+                    cfg.erase("session_email");
+                    cfg.erase("session_person_name");
+                    cfg.erase("session_token");
+                }
+                if (ImGui::Selectable(fmt::format("{} Save", ICON_FA_SAVE).data())) cfg_save();
+                // if (ImGui::Selectable(fmt::format("{} Theme", ICON_FA_PAINT_ROLLER).data()));
                 if (ImGui::Selectable(fmt::format("{} Quit", ICON_FA_SKULL).data())) keep_running = false;
                 ImGui::EndMenu();
             }
+            /*
             if (ImGui::BeginMenu(fmt::format("{} System", ICON_FA_CALCULATOR).data())) {
                 if (!legacy_is_default) {
                     if (devices.size() || device_contexts.size()) {
@@ -887,6 +1077,18 @@ namespace sc::visor::gui {
 }
 
 void sc::visor::gui::initialize() {
+    if (const auto err = cfg_load(); err) spdlog::error("Unable to load settings: {}", *err);
+    else if (cfg.find("session_token") != cfg.end() && cfg.find("session_person_name") != cfg.end() && cfg.find("session_email") != cfg.end()) {
+        account_session_token = cfg["session_token"];
+        account_person_name = cfg["session_person_name"];
+        account_email = cfg["session_email"];
+        should_verify_session_token = true;
+        spdlog::info("Stored session token: {} ({})", cfg["session_person_name"], cfg["session_token"]);
+        account_login_response = api::customer::check_session_token(
+            account_email->data(),
+            account_session_token->data()
+        );
+    }
     prepare_styling();
     load_animations();
     animation_scan.loop = true;
