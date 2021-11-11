@@ -7,6 +7,7 @@
 #include <string_view>
 #include <array>
 #include <vector>
+#include <queue>
 #include <optional>
 #include <functional>
 #include <future>
@@ -19,7 +20,9 @@
 #include <spdlog/spdlog.h>
 #include <pystring.h>
 #include <magic_enum.hpp>
+#include <nlohmann/json.hpp>
 
+#include "../../libs/file/file.h"
 #include "../../libs/font/font_awesome_5.h"
 #include "../../libs/font/font_awesome_5_brands.h"
 #include "../../libs/imgui/imgui_utils.hpp"
