@@ -1000,16 +1000,14 @@ namespace sc::visor::gui {
                 }
                 ImGui::EndTabItem();
             }
+            /*
             if (ImGui::BeginTabItem(fmt::format("{} iRacing", ICON_FA_FLAG_CHECKERED).data())) {
                 ImGui::Text(fmt::format("Status: {}", magic_enum::enum_name(iracing::get_status())).data());
                 ImGui::EndTabItem();
             }
+            */
             ImGui::EndTabBar();
         }
-    }
-
-    static void emit_content_panel() {
-        emit_content_device_panel();
     }
 
     static void try_toggle_legacy_support() {
@@ -1141,7 +1139,7 @@ void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size, bool *const force_
     ImGui::SetNextWindowSize({ static_cast<float>(framebuffer_size.x), static_cast<float>(framebuffer_size.y) }, ImGuiCond_Always);
     if (ImGui::Begin("##PrimaryWindow", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
         emit_primary_window_menu_bar();
-        emit_content_panel();
+        emit_content_device_panel();
     }
     ImGui::End();
     popups_emit(framebuffer_size);
