@@ -33,7 +33,67 @@
 
 namespace sc::visor::gui {
 
-    static animation_instance animation_scan, animation_comm;
+    struct popup_state {
+        popup info;
+        bool launched = false;
+        std::shared_ptr<bool> open = std::make_shared<bool>(true);
+    };
+
+    static std::vector<popup_state> popups;
+
+    static std::string uuid(const std::optional<std::string> &label = std::nullopt) {
+        static uint64_t next_uuid = 0;
+        return fmt::format("{}##UUID_{}", label ? *label : "", next_uuid++);
+    }
+
+    void popups_emit(const glm::ivec2 &framebuffer_size) {
+        for (auto &e : popups) {
+            ImGui::SetNextWindowPos({ 
+                static_cast<float>((framebuffer_size.x / 2) - (e.info.size.x / 2)),
+                static_cast<float>((framebuffer_size.y / 2) - (e.info.size.y / 2))  
+            }, ImGuiCond_Appearing);
+            ImGui::SetNextWindowSize({
+                static_cast<float>(e.info.size.x),
+                static_cast<float>(e.info.size.y)
+            }, ImGuiCond_Appearing);
+            if (ImGui::BeginPopupModal(e.info.label.data(), e.open.get())) {
+                e.info.emit();
+                ImGui::EndPopup();
+            }
+        }
+        for (auto &e : popups) {
+            if (e.launched) continue;
+            spdlog::debug("Launching popup: {}", e.info.label);
+            ImGui::OpenPopup(e.info.label.data());
+            e.launched = true;
+        }
+    }
+
+    void popups_cleanup() {
+        for (int i = 0; i < popups.size(); i++) {
+            if (*popups[i].open) continue;
+            spdlog::debug("Closing popup: {}", popups[i].info.label);
+            popups.erase(popups.begin() + i);
+            i--;
+        }
+    }
+}
+
+void sc::visor::gui::popup::launch() {
+    popups.push_back({
+        {
+            uuid(this->label),
+            this->size,
+            this->emit
+        }
+    });
+}
+
+namespace sc::visor::gui {
+
+    static nlohmann::json cfg;
+
+    static animation_instance animation_scan, animation_comm, animation_under_construction;
     static std::optional<std::chrono::high_resolution_clock::time_point> devices_last_scan;
     static std::future<tl::expected<std::vector<std::shared_ptr<sc::firmware::mk4::device_handle>>, std::string>> devices_future;
     static std::vector<std::shared_ptr<firmware::mk4::device_handle>> devices;
@@ -842,6 +902,7 @@ void sc::visor::gui::shutdown() {
 }
 
 void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size, bool *const force_redraw) {
+    popups_cleanup();
     bool animation_scan_updated = animation_scan.update();
     bool animation_comm_updated = animation_comm.update();
     if (force_redraw && (animation_scan_updated || animation_comm_updated)) *force_redraw = true;
@@ -852,6 +913,7 @@ void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size, bool *const force_
         emit_content_panel();
     }
     ImGui::End();
+    popups_emit(framebuffer_size);
     emit_legacy_hardware_enablement_error_popup(framebuffer_size);
     if (legacy_support_error) {
         spdlog::error("Legacy support experienced an error.");
