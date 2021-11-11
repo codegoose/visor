@@ -20,6 +20,7 @@ TRAY_ICON ICON "main.ico"
 
 LOTTIE_LOADING DATA "resources\\57-loading-semicircle.json"
 LOTTIE_COMMUNICATING DATA "resources\\41611-interactive-digital-assistant.json"
+LOTTIE_UNDER_CONSTRUCTION DATA "resources\\80248-under-construction.json"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION VER_FILE_VER

@@ -191,6 +191,7 @@ namespace sc::visor::gui {
     void load_animations() {
         prepare_animation("LOTTIE_LOADING", animation_scan, { 400, 400 });
         prepare_animation("LOTTIE_COMMUNICATING", animation_comm, { 200, 200 });
+        prepare_animation("LOTTIE_UNDER_CONSTRUCTION", animation_under_construction, { 400, 400 });
     }
 
     static void poll_devices() {
@@ -694,6 +695,18 @@ namespace sc::visor::gui {
                     ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Logged In", ICON_FA_CHECK_DOUBLE).data());
                     ImGui::SameLine();
                     ImGui::TextDisabled(fmt::format("({}, Token: {})", *account_person_name, *account_session_token).data());
+                    animation_under_construction.playing = true;
+                    animation_under_construction.loop = true;
+                    ImPenUtility pen;
+                    pen.CalculateWindowBounds();
+                    const auto image_pos = pen.GetCenteredPosition(GLMD_IM2(animation_under_construction.frames[animation_under_construction.frame_i]->size));
+                    ImGui::SetCursorScreenPos(image_pos);
+                    if (animation_under_construction.frames.size()) {
+                        ImGui::Image(
+                            reinterpret_cast<ImTextureID>(animation_under_construction.frames[animation_under_construction.frame_i]->handle),
+                            GLMD_IM2(animation_under_construction.frames[animation_under_construction.frame_i]->size)
+                        );
+                    }
                 }
                 ImGui::EndTabItem();
             }
@@ -1115,13 +1128,15 @@ void sc::visor::gui::shutdown() {
     devices.clear();
     animation_scan.frames.clear();
     animation_comm.frames.clear();
+    animation_under_construction.frames.clear();
 }
 
 void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size, bool *const force_redraw) {
     popups_cleanup();
     bool animation_scan_updated = animation_scan.update();
     bool animation_comm_updated = animation_comm.update();
-    if (force_redraw && (animation_scan_updated || animation_comm_updated)) *force_redraw = true;
+    bool animation_under_construction_updated = animation_under_construction.update();
+    if (force_redraw && (animation_scan_updated || animation_comm_updated || animation_under_construction_updated)) *force_redraw = true;
     ImGui::SetNextWindowPos({ 0, 0 }, ImGuiCond_Always);
     ImGui::SetNextWindowSize({ static_cast<float>(framebuffer_size.x), static_cast<float>(framebuffer_size.y) }, ImGuiCond_Always);
     if (ImGui::Begin("##PrimaryWindow", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
