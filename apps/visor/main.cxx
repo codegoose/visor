@@ -28,7 +28,7 @@ static bool enforce_one_instance() {
 
 static std::optional<std::string> sc::boot::on_startup() {
     if (!enforce_one_instance()) return "Duplicate instance.";
-    iracing::startup();
+    // iracing::startup();
     visor::gui::initialize();
     return std::nullopt;
 }
@@ -48,6 +48,6 @@ static tl::expected<bool, std::string> sc::boot::on_update(const glm::ivec2 &fra
 
 static void sc::boot::on_shutdown() {
     visor::gui::shutdown();
-    iracing::shutdown();
+    // iracing::shutdown();
     visor::legacy::disable();
 }
