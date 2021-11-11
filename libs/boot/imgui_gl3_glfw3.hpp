@@ -10,6 +10,10 @@
 
 #include <tl/expected.hpp>
 
+#include <argparse/argparse.hpp>
+
+static argparse::ArgumentParser program(VER_APP_NAME, VER_APP_VER);
+
 #include <glm/glm.hpp>
 
 #include <spdlog/spdlog.h>
@@ -182,10 +186,12 @@ static void _sc_glfw_render() {
     const auto draw_data = ImGui::GetDrawData();
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
-    if (static bool shown_window = false; !shown_window) {
-        spdlog::debug("First render complete. Making window visible.");
-        glfwShowWindow(glfw_window);
-        shown_window = true;
+    if (static bool bg = program.get<bool>("--background"); !bg) {
+        if (static bool shown_window = false; !shown_window) {
+            spdlog::debug("First render complete. Making window visible.");
+            glfwShowWindow(glfw_window);
+            shown_window = true;
+        }
     }
     ImGui_ImplOpenGL3_RenderDrawData(draw_data);
     glfwSwapBuffers(glfw_window);
@@ -323,6 +329,15 @@ static std::optional<std::string> _sc_run(GLFWwindow *glfw_window, ImGuiContext 
 #include <pystring.h>
 
 static int _sc_entry_point() {
+static int _sc_entry_point(int arg_c, char **arg_v) {
+    program.add_argument("--background").help("start in system tray, not visible").default_value(false).implicit_value(true);
+    try {
+        program.parse_args(arg_c, arg_v);
+    } catch (const std::runtime_error &err) {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
+        return -1;
+    }
     #ifdef SC_FEATURE_SENTRY
         #ifdef NDEBUG
             #pragma message("[EON] Using Sentry.")
@@ -352,6 +367,6 @@ static int _sc_entry_point() {
     return 0;
 }
 
-int main() {
-    return _sc_entry_point();
+int main(int arg_c, char **arg_v) {
+    return _sc_entry_point(arg_c, arg_v);
 }

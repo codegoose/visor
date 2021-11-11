@@ -20,6 +20,7 @@ target_link_libraries(visor
     CONAN_PKG::freetype
     CONAN_PKG::pystring
     CONAN_PKG::magic_enum
+    CONAN_PKG::argparse
 
     api
     boot
