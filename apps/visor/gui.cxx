@@ -1036,12 +1036,15 @@ namespace sc::visor::gui {
                         }
                     } else ImGui::TextDisabled("No devices.");
                 }
-                ImGui::Selectable(fmt::format("{} Clear System Calibrations", ICON_FA_ERASER).data());
+                if (ImGui::Selectable(fmt::format("{} Clear System Calibrations", ICON_FA_ERASER).data())) {
+
+                }
                 if (!legacy_is_default && ImGui::Selectable(fmt::format("{} {} Legacy Support", ICON_FA_RECYCLE, enable_legacy_support ? "Disable" : "Enable").data())) {
                     try_toggle_legacy_support();
                 }
                 ImGui::EndMenu();
             }
+            */
             if (ImGui::BeginMenu(fmt::format("{} Help", ICON_FA_QUESTION_CIRCLE).data())) {
                 ImGui::Selectable(fmt::format("{} Report Bug", ICON_FA_BUG).data());
                 ImGui::Selectable(fmt::format("{} Make Comment", ICON_FA_COMMENT_ALT).data());
