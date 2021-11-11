@@ -807,7 +807,9 @@ namespace sc::visor::gui {
                                         ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 24.f / 255.f, 24.f / 255.f, 24.f / 255.f, 1.f });
                                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 24.f / 255.f, 24.f / 255.f, 24.f / 255.f, 1.f });
                                     }
-                                    if (ImGui::Button(fmt::format("Axis #{}", i + 1).data(), { ImGui::GetContentRegionAvail().x, 40 })) current_selection = i;
+                                    if (legacy::axes[i].label) {
+                                        if (ImGui::Button(fmt::format("{}##VirtualAxis{}SelectionButton", legacy::axes[i].label->data(), i).data(), { ImGui::GetContentRegionAvail().x, 40 })) current_selection = i;
+                                    } else if (ImGui::Button(fmt::format("Axis #{}##VirtualAxis{}SelectionButton", i, i).data(), { ImGui::GetContentRegionAvail().x, 40 })) current_selection = i;
                                     ImGui::PopStyleColor(3);
                                     ImGui::ProgressBar(legacy::axes[i].output, { ImGui::GetContentRegionAvail().x, 8 }, "");
                                 }
@@ -820,6 +822,15 @@ namespace sc::visor::gui {
                                 if (ImGui::BeginMenuBar()) {
                                     ImGui::Text(fmt::format("{} Axis #{} Configurations", ICON_FA_COGS, current_selection + 1).data());
                                     ImGui::EndMenuBar();
+                                }
+                                ImGui::SetNextItemWidth(400);
+                                ImGui::InputTextWithHint(fmt::format("##VirtualAxis#{}_LabelInput", current_selection).data(), "Label", legacy::axes[current_selection].label_buffer.data(), legacy::axes[current_selection].label_buffer.size());
+                                ImGui::SameLine();
+                                if (ImGui::Button(fmt::format("Set Label##VirtualAxis#{}_LabelUpdateButton", current_selection).data(), { ImGui::GetContentRegionAvail().x, 0 })) {
+                                    if (const auto trimmed = pystring::strip(legacy::axes[current_selection].label_buffer.data(), ""); trimmed != "") {
+                                        spdlog::debug("Update label: {}", trimmed);
+                                        legacy::axes[current_selection].label = trimmed;
+                                    } else legacy::axes[current_selection].label.reset();
                                 }
                                 if (ImGui::BeginChild("##{}InputRangeWindow", { 0, 164 }, true, ImGuiWindowFlags_MenuBar)) {
                                     bool update_axis_range = false;

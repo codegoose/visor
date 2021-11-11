@@ -216,6 +216,7 @@ std::optional<std::string> sc::visor::legacy::save_settings() {
         axis_doc["deadzone"] = axes[i].deadzone;
         axis_doc["limit"] = axes[i].output_limit;
         if (axes[i].curve_i != -1) axis_doc["curve"] = axes[i].curve_i;
+        if (axes[i].label) axis_doc["label"] = axes[i].label->data();
         axes_doc.push_back(axis_doc);
     }
     doc["axes"] = axes_doc;
@@ -255,6 +256,7 @@ std::optional<std::string> sc::visor::legacy::load_settings() {
             axes[i].output_limit = axes_doc->at(i).value("limit", 100);
             axes[i].curve_i = axes_doc->at(i).value("curve", -1);
             axes[i].model_edit_i = axes[i].curve_i;
+            if (axes_doc->at(i).find("label") != axes_doc->at(i).end()) axes[i].label = axes_doc->at(i)["label"];
         }
     }
     if (auto models_doc = doc.find("models"); models_doc != doc.end() && models_doc->is_array()) {

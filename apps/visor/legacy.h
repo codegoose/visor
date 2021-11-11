@@ -22,6 +22,8 @@ namespace sc::visor::legacy {
         int output_limit = 100;
         int model_edit_i = -1;
         int curve_i = -1;
+        std::optional<std::string> label;
+        std::array<char, 50> label_buffer;
     };
 
     struct model {
