@@ -1127,6 +1127,7 @@ void sc::visor::gui::shutdown() {
     animation_scan.frames.clear();
     animation_comm.frames.clear();
     animation_under_construction.frames.clear();
+    if (const auto err = cfg_save(); err) spdlog::error("Unable to save settings: {}", *err);
 }
 
 void sc::visor::gui::emit(const glm::ivec2 &framebuffer_size, bool *const force_redraw) {
