@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<DOCUMENT Type="Advanced Installer" CreateVersion="18.8" version="18.8" Modules="professional" RootPath="." Language="en" Id="{D4993946-90C4-4A3B-9840-F9693B4D2463}">
+<DOCUMENT Type="Advanced Installer" CreateVersion="18.8" version="18.8.1" Modules="professional" RootPath="." Language="en" Id="{D4993946-90C4-4A3B-9840-F9693B4D2463}">
   <COMPONENT cid="caphyon.advinst.msicomp.MsiPropsComponent">
     <ROW Property="AI_BITMAP_DISPLAY_MODE" Value="0"/>
     <ROW Property="AI_COLOR_DISABLED_TEXT" Value="3026478" MsiKey="AI_COLOR_DISABLED_TEXT"/>
@@ -25,10 +25,10 @@
     <ROW Property="ARPSYSTEMCOMPONENT" Value="1"/>
     <ROW Property="ARPURLINFOABOUT" Value="https://discord.gg/4jNDqjyZnK"/>
     <ROW Property="Manufacturer" Value="Sim Coaches"/>
-    <ROW Property="ProductCode" Value="1033:{CC3A23DD-EAFE-4794-9677-0AC037352D4C} " Type="16"/>
+    <ROW Property="ProductCode" Value="1033:{ECFC9D17-2474-4511-9317-515F949EBBB8} " Type="16"/>
     <ROW Property="ProductLanguage" Value="1033"/>
     <ROW Property="ProductName" Value="Visor"/>
-    <ROW Property="ProductVersion" Value="2.0.14.900" Type="32" TargetFile="visor.exe"/>
+    <ROW Property="ProductVersion" Value="2.0.15.1100" Type="32" TargetFile="visor.exe"/>
     <ROW Property="SecureCustomProperties" Value="OLDPRODUCTS;AI_NEWERPRODUCTFOUND;AI_SETUPEXEPATH;SETUPEXEDIR"/>
     <ROW Property="UpgradeCode" Value="{B2C8F591-943D-452B-B229-C9896A334F91}"/>
     <ROW Property="WindowsType9X" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
@@ -46,16 +46,18 @@
     <ROW Directory="DesktopFolder" Directory_Parent="TARGETDIR" DefaultDir="DESKTO~1|DesktopFolder" IsPseudoRoot="1"/>
     <ROW Directory="ProgramMenuFolder" Directory_Parent="TARGETDIR" DefaultDir="PROGRA~1|ProgramMenuFolder" IsPseudoRoot="1"/>
     <ROW Directory="SimCoaches_Dir" Directory_Parent="CommonAppDataFolder" DefaultDir="SIMCOA~1|Sim Coaches"/>
+    <ROW Directory="StartupFolder" Directory_Parent="TARGETDIR" DefaultDir="STARTU~1|StartupFolder" IsPseudoRoot="1"/>
     <ROW Directory="TARGETDIR" DefaultDir="SourceDir"/>
     <ROW Directory="Visor_Dir" Directory_Parent="SimCoaches_Dir" DefaultDir="Visor"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiCompsComponent">
-    <ROW Component="AI_CustomARPName" ComponentId="{9CAAF861-1AA8-45F1-88D3-2760E4A7ED43}" Directory_="APPDIR" Attributes="260" KeyPath="DisplayName" Options="1"/>
+    <ROW Component="AI_CustomARPName" ComponentId="{C86D376B-1031-45E8-A3EE-906C504923FF}" Directory_="APPDIR" Attributes="260" KeyPath="DisplayName" Options="1"/>
     <ROW Component="AI_DisableModify" ComponentId="{CF706FCD-53DA-4000-9EAF-9D0BE56B3121}" Directory_="APPDIR" Attributes="260" KeyPath="NoModify" Options="1"/>
     <ROW Component="AI_ExePath" ComponentId="{7445D5DC-17B7-49E2-A98E-DF5AF1A1F0DB}" Directory_="APPDIR" Attributes="260" KeyPath="AI_ExePath"/>
     <ROW Component="APPDIR" ComponentId="{A56C25AA-EC51-4284-8499-AA2609BA4B9F}" Directory_="APPDIR" Attributes="0"/>
     <ROW Component="ProductInformation" ComponentId="{E6BC61F1-87B8-4022-B6CD-619BD8A96AE3}" Directory_="APPDIR" Attributes="260" KeyPath="Version"/>
     <ROW Component="Visor" ComponentId="{8B7DAAAD-28B7-488F-B8B7-3B66B61536C2}" Directory_="Visor_Dir" Attributes="0"/>
+    <ROW Component="cleanup.exe" ComponentId="{081E3907-067D-41CA-B84D-1E8B6C0DBF9D}" Directory_="APPDIR" Attributes="256" KeyPath="cleanup.exe"/>
     <ROW Component="visor.exe" ComponentId="{81DA3348-3A08-4286-81EE-B6D395CE4AE0}" Directory_="APPDIR" Attributes="256" KeyPath="visor.exe"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiFeatsComponent">
@@ -64,6 +66,7 @@
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiFilesComponent">
     <ROW File="visor.exe" Component_="visor.exe" FileName="visor.exe" Attributes="0" SourcePath="&lt;AI_APPPATH_PERBUILD_visor.exe&gt;" SelfReg="false" DigSign="true"/>
+    <ROW File="cleanup.exe" Component_="cleanup.exe" FileName="cleanup.exe" Attributes="0" SourcePath="build_rel\bin\cleanup.exe" SelfReg="false" DigSign="true"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.AppPathsComponent">
     <ROW Name="AI_APPPATH_PERBUILD_visor.exe" Path="[|AI_PROPPATH_PERBUILD_visor.exe]" Type="2" Content="0"/>
@@ -240,6 +243,7 @@
     <ROW Feature_="MainFeature" Component_="AI_CustomARPName"/>
     <ROW Feature_="MainFeature" Component_="AI_DisableModify"/>
     <ROW Feature_="MainFeature" Component_="Visor"/>
+    <ROW Feature_="MainFeature" Component_="cleanup.exe"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiIconsComponent">
     <ROW Name="visor.exe" SourcePath="build_rel\bin\visor.exe" Index="0"/>
@@ -315,8 +319,10 @@
     <ROW Registry="VersionMinor" Root="-1" Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductName] [ProductVersion]" Name="VersionMinor" Value="#0" Component_="AI_CustomARPName" VirtualValue="#"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiShortsComponent">
+    <ROW Shortcut="SimCoachesCleanupTool" Directory_="ProgramMenuFolder" Name="SIMCOA~2|Sim Coaches Cleanup Tool" Component_="cleanup.exe" Target="[#cleanup.exe]" Description="Remove legacy Sim Coaches software." Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="APPDIR"/>
     <ROW Shortcut="SimCoachesVisor" Directory_="ProgramMenuFolder" Name="SIMCOA~1|Sim Coaches Visor" Component_="visor.exe" Target="[#visor.exe]" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
     <ROW Shortcut="SimCoachesVisor_1" Directory_="DesktopFolder" Name="SIMCOA~1|Sim Coaches Visor" Component_="visor.exe" Target="[#visor.exe]" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
+    <ROW Shortcut="SimCoachesVisor_2" Directory_="StartupFolder" Name="SIMCOA~1|Sim Coaches Visor" Component_="visor.exe" Target="[#visor.exe]" Arguments="--background" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiThemeComponent">
     <ATTRIBUTE name="UsedTheme" value="surface"/>
