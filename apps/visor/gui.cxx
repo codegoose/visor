@@ -404,7 +404,7 @@ namespace sc::visor::gui {
                             if (err) spdlog::warn(*err);
                             else spdlog::info("Model updated.");
                         }
-                        if (context->axes[axis_i].curve_i != context->axes_ex[axis_i].model_edit_i && ImGui::Button("Make Active", { ImGui::GetContentRegionAvail().x, 0 })) {
+                        if (context->axes[axis_i].curve_i != context->axes_ex[axis_i].model_edit_i) {
                             const auto err = context->handle->set_axis_bezier_index(axis_i, context->axes_ex[axis_i].model_edit_i);
                             if (err) spdlog::warn(*err);
                             else spdlog::info("Axis model index updated.");
@@ -954,7 +954,7 @@ namespace sc::visor::gui {
                                                 if (ImGui::SliderInt(fmt::format("Y##{}", i + 1).data(), &legacy::models[legacy::axes[current_selection].model_edit_i].points[i].y, 0, 100));
                                             }
                                             ImGui::PopItemWidth();
-                                            if (legacy::axes[current_selection].curve_i != legacy::axes[current_selection].model_edit_i && ImGui::Button("Make Active", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            if (legacy::axes[current_selection].curve_i != legacy::axes[current_selection].model_edit_i) {
                                                 legacy::axes[current_selection].curve_i = legacy::axes[current_selection].model_edit_i;
                                             }
                                         }
