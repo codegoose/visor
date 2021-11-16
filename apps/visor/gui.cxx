@@ -34,6 +34,12 @@
 #include "bezier.h"
 #include "im_glm_vec.hpp"
 
+#include <windows.h>
+#include <shellapi.h>
+
+#undef min
+#undef max
+
 namespace sc::visor::gui {
 
     struct popup_state {
@@ -125,6 +131,7 @@ namespace sc::visor::gui {
     static std::optional<std::string> account_pw_reset_confirm_error;
     static bool account_remember_me = false;
     static bool account_pw_reset_awaits = false;
+    static bool account_activation_awaits = false;
 
     static std::optional<std::string> cfg_load() {
         const auto load_res = file::load("settings.json");
@@ -504,8 +511,8 @@ namespace sc::visor::gui {
                                 }
                                 ImGui::EndTabItem();
                             }
-                            if (ImGui::BeginTabItem("Create New")) {
-                                if (account_creation_response) {
+                            if (ImGui::BeginTabItem("Create Account")) {
+                                if (account_creation_response || account_confirmation_response) {
                                     animation_scan.play = true;
                                     ImPenUtility pen;
                                     pen.CalculateWindowBounds();
@@ -520,7 +527,7 @@ namespace sc::visor::gui {
                                             { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
                                         );
                                     }
-                                    if (account_creation_response->valid()) {
+                                    if (account_creation_response && account_creation_response->valid()) {
                                         if (const auto status = account_creation_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
                                             const auto response = account_creation_response->get();
                                             if (response.has_value()) {
@@ -535,7 +542,10 @@ namespace sc::visor::gui {
                                                             cfg["session_person_name"] = *account_person_name;
                                                         }
                                                         account_creation_error.reset();
-                                                    } else account_creation_error = response->value("message", "An error occurred.");
+                                                    } else {
+                                                        account_creation_error = response->value("message", "An error occurred.");
+                                                        account_activation_awaits = true;
+                                                    }
                                                     
                                                 }
                                             } else {
@@ -545,25 +555,69 @@ namespace sc::visor::gui {
                                             account_creation_response.reset();
                                         }
                                     }
+                                    if (account_confirmation_response && account_confirmation_response->valid()) {
+                                        if (const auto status = account_confirmation_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
+                                            const auto response = account_confirmation_response->get();
+                                            if (response.has_value()) {
+                                                account_confirmation_error = response->value("message", "An error occurred.");
+                                            } else {
+                                                spdlog::error("Unable to activate account: {}", response.error());
+                                                account_confirmation_error = response.error();
+                                            }
+                                            account_confirmation_response.reset();
+                                        }
+                                    }
                                 } else {
-                                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
-                                    ImGui::InputTextWithHint("##AccountEnablementNameInput", "name", account_name_input_buffer.data(), account_name_input_buffer.size(), flags);
-                                    ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
-                                    ImGui::InputTextWithHint("##AccountEnablementPasswordInput", "password", account_password_input_buffer.data(), account_password_input_buffer.size(), flags | ImGuiInputTextFlags_Password);
-                                    ImGui::PopItemWidth();
-                                    if (ImGui::Button("Create Account", { ImGui::GetContentRegionAvail().x, 0 })) {
-                                        spdlog::debug("Starting account creation attempt now.");
-                                        account_creation_response = api::customer::create_new(
-                                            account_email_input_buffer.data(),
-                                            account_name_input_buffer.data(),
-                                            account_password_input_buffer.data()
-                                        );
-                                        animation_scan.frame_i = 0;
+                                    if (account_activation_awaits) {
+                                        ImGui::TextWrapped("Enter the account activation code that was sent to your email address. If it doesn't arrive, try checking your spam folder.");
+                                        ImGui::Separator();
+                                        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+                                        ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
+                                        ImGui::InputTextWithHint("##AccountEnablementPinInput", "code", account_code_input_buffer.data(), account_code_input_buffer.size(), flags);
+                                        ImGui::PopItemWidth();
+                                        if (ImGui::Button("Activate Account", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            spdlog::debug("Starting account activation attempt now.");
+                                            account_confirmation_response = api::customer::activate_account(
+                                                account_email_input_buffer.data(),
+                                                account_code_input_buffer.data()
+                                            );
+                                            animation_scan.frame_i = 0;
+                                        }
+                                        if (ImGui::Button("Request Activation Code", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            account_activation_awaits = false;
+                                            account_confirmation_error.reset();
+                                            account_creation_error.reset();
+                                        }
+                                    } else {
+                                        ImGui::TextWrapped("You can create an account here. An email with an activation code in it will be sent you. You must provide it on the next page in order to activate your account. If it doesn't arrive, try checking your spam folder.");
+                                        ImGui::Separator();
+                                        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+                                        ImGui::InputTextWithHint("##AccountEnablementNameInput", "name", account_name_input_buffer.data(), account_name_input_buffer.size(), flags);
+                                        ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
+                                        ImGui::InputTextWithHint("##AccountEnablementPasswordInput", "password", account_password_input_buffer.data(), account_password_input_buffer.size(), flags | ImGuiInputTextFlags_Password);
+                                        ImGui::PopItemWidth();
+                                        if (ImGui::Button("Create Account", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            spdlog::debug("Starting account creation attempt now.");
+                                            account_creation_response = api::customer::create_new(
+                                                account_email_input_buffer.data(),
+                                                account_name_input_buffer.data(),
+                                                account_password_input_buffer.data()
+                                            );
+                                            animation_scan.frame_i = 0;
+                                        }
+                                        if (ImGui::Button("Use Activation Code", { ImGui::GetContentRegionAvail().x, 0 })) {
+                                            account_activation_awaits = true;
+                                            account_confirmation_error.reset();
+                                            account_creation_error.reset();
+                                            account_code_input_buffer.fill(0);
+                                        }
                                     }
                                     if (account_creation_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_creation_error->data());
+                                    if (account_confirmation_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_confirmation_error->data());
                                 }
                                 ImGui::EndTabItem();
                             }
+                            /*
                             if (ImGui::BeginTabItem("Activate")) {
                                 if (account_confirmation_response) {
                                     animation_scan.play = true;
@@ -580,35 +634,12 @@ namespace sc::visor::gui {
                                             { 1, 1, 1, animation_scan.playing ? 1 : 0.8f }
                                         );
                                     }
-                                    if (account_confirmation_response->valid()) {
-                                        if (const auto status = account_confirmation_response->wait_for(std::chrono::seconds(0)); status == std::future_status::ready) {
-                                            const auto response = account_confirmation_response->get();
-                                            if (response.has_value()) {
-                                                account_confirmation_error = response->value("message", "An error occurred.");
-                                            } else {
-                                                spdlog::error("Unable to activate account: {}", response.error());
-                                                account_confirmation_error = response.error();
-                                            }
-                                            account_confirmation_response.reset();
-                                        }
-                                    }
                                 } else {
-                                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
-                                    ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
-                                    ImGui::InputTextWithHint("##AccountEnablementPinInput", "code", account_code_input_buffer.data(), account_code_input_buffer.size(), flags);
-                                    ImGui::PopItemWidth();
-                                    if (ImGui::Button("Activate Account", { ImGui::GetContentRegionAvail().x, 0 })) {
-                                        spdlog::debug("Starting account activation attempt now.");
-                                        account_confirmation_response = api::customer::activate_account(
-                                            account_email_input_buffer.data(),
-                                            account_code_input_buffer.data()
-                                        );
-                                        animation_scan.frame_i = 0;
-                                    }
-                                    if (account_confirmation_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_confirmation_error->data());
+
                                 }
                                 ImGui::EndTabItem();
                             }
+                            */
                             if (ImGui::BeginTabItem("Reset Password")) {
                                 if (account_pw_reset_response || account_pw_reset_confirm_response) {
                                     animation_scan.play = true;
@@ -630,7 +661,11 @@ namespace sc::visor::gui {
                                             const auto response = account_pw_reset_response->get();
                                             if (response.has_value()) {
                                                 account_pw_reset_error = response->value("message", "An error occurred.");
-                                                if (!response->value("error", true)) account_pw_reset_awaits = true;
+                                                if (!response->value("error", true)) {
+                                                    account_pw_reset_awaits = true;
+                                                    account_password_input_buffer.fill(0);
+                                                    account_code_input_buffer.fill(0);
+                                                }
                                             } else {
                                                 spdlog::error("Unable to reset password: {}", response.error());
                                                 account_pw_reset_error = response.error();
@@ -643,9 +678,6 @@ namespace sc::visor::gui {
                                             const auto response = account_pw_reset_confirm_response->get();
                                             if (response.has_value()) {
                                                 account_pw_reset_confirm_error = response->value("message", "An error occurred.");
-                                                if (response->value("error", true)) {
-                                                    account_pw_reset_awaits = true;
-                                                }
                                             } else {
                                                 spdlog::error("Unable to reset password: {}", response.error());
                                                 account_pw_reset_confirm_error = response.error();
@@ -655,6 +687,8 @@ namespace sc::visor::gui {
                                     }
                                 } else {
                                     if (account_pw_reset_awaits) {
+                                        ImGui::TextWrapped("Enter the password reset code that was sent to your email address. If it doesn't arrive, try checking your spam folder.");
+                                        ImGui::Separator();
                                         ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
                                         ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
                                         ImGui::InputTextWithHint("##AccountEnablementPinInput", "code", account_code_input_buffer.data(), account_code_input_buffer.size(), flags);
@@ -672,8 +706,9 @@ namespace sc::visor::gui {
                                             account_pw_reset_error.reset();
                                             account_pw_reset_confirm_error.reset();
                                         }
-                                        if (account_pw_reset_confirm_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_pw_reset_confirm_error->data());
                                     } else {
+                                        ImGui::TextWrapped("You can reset your password here. An email with a reset code in it will be sent you. You must provide it on the next page in order to reset your password. If it doesn't arrive, try checking your spam folder.");
+                                        ImGui::Separator();
                                         ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
                                         ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags);
                                         ImGui::PopItemWidth();
@@ -685,8 +720,10 @@ namespace sc::visor::gui {
                                             account_pw_reset_error.reset();
                                             account_pw_reset_confirm_error.reset();
                                         }
-                                        if (account_pw_reset_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_pw_reset_error->data());
+                                        
                                     }
+                                    if (account_pw_reset_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_pw_reset_error->data());
+                                    if (account_pw_reset_confirm_error) ImGui::TextColored({ 192.f / 255.f, 32.f / 255.f, 32.f / 255.f, 1.f }, account_pw_reset_confirm_error->data());
                                 }
                                 ImGui::EndTabItem();
                             }
@@ -1059,10 +1096,11 @@ namespace sc::visor::gui {
                 ImGui::EndMenu();
             }
             */
-            if (ImGui::BeginMenu(fmt::format("{} Help", ICON_FA_QUESTION_CIRCLE).data())) {
-                ImGui::Selectable(fmt::format("{} Report Bug", ICON_FA_BUG).data());
-                ImGui::Selectable(fmt::format("{} Make Comment", ICON_FA_COMMENT_ALT).data());
-                ImGui::EndMenu();
+            if (ImGui::SmallButton(fmt::format("{} Get Help", ICON_FA_HANDS_HELPING).data())) ShellExecuteA(0, 0, "https://discord.com/invite/4jNDqjyZnK", 0, 0 , SW_SHOW );
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("This will take you to our Discord page where you can chat with us.");
+                ImGui::EndTooltip();
             }
             ImGui::EndMenuBar();
         }

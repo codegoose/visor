@@ -25,10 +25,10 @@
     <ROW Property="ARPSYSTEMCOMPONENT" Value="1"/>
     <ROW Property="ARPURLINFOABOUT" Value="https://discord.gg/4jNDqjyZnK"/>
     <ROW Property="Manufacturer" Value="Sim Coaches"/>
-    <ROW Property="ProductCode" Value="1033:{ECFC9D17-2474-4511-9317-515F949EBBB8} " Type="16"/>
+    <ROW Property="ProductCode" Value="1033:{2A7BA78A-DEAD-461A-A41F-DC9CDEE53806} " Type="16"/>
     <ROW Property="ProductLanguage" Value="1033"/>
     <ROW Property="ProductName" Value="Visor"/>
-    <ROW Property="ProductVersion" Value="2.0.15.1100" Type="32" TargetFile="visor.exe"/>
+    <ROW Property="ProductVersion" Value="2.0.18.1152" Type="32" TargetFile="visor.exe"/>
     <ROW Property="SecureCustomProperties" Value="OLDPRODUCTS;AI_NEWERPRODUCTFOUND;AI_SETUPEXEPATH;SETUPEXEDIR"/>
     <ROW Property="UpgradeCode" Value="{B2C8F591-943D-452B-B229-C9896A334F91}"/>
     <ROW Property="WindowsType9X" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
@@ -51,7 +51,7 @@
     <ROW Directory="Visor_Dir" Directory_Parent="SimCoaches_Dir" DefaultDir="Visor"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiCompsComponent">
-    <ROW Component="AI_CustomARPName" ComponentId="{C86D376B-1031-45E8-A3EE-906C504923FF}" Directory_="APPDIR" Attributes="260" KeyPath="DisplayName" Options="1"/>
+    <ROW Component="AI_CustomARPName" ComponentId="{AE0A888B-5A69-4074-8A0C-03AC20A97167}" Directory_="APPDIR" Attributes="260" KeyPath="DisplayName" Options="1"/>
     <ROW Component="AI_DisableModify" ComponentId="{CF706FCD-53DA-4000-9EAF-9D0BE56B3121}" Directory_="APPDIR" Attributes="260" KeyPath="NoModify" Options="1"/>
     <ROW Component="AI_ExePath" ComponentId="{7445D5DC-17B7-49E2-A98E-DF5AF1A1F0DB}" Directory_="APPDIR" Attributes="260" KeyPath="AI_ExePath"/>
     <ROW Component="APPDIR" ComponentId="{A56C25AA-EC51-4284-8499-AA2609BA4B9F}" Directory_="APPDIR" Attributes="0"/>
