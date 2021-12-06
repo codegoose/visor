@@ -7,6 +7,9 @@
 #include <optional>
 #include <chrono>
 #include <algorithm>
+#include <map>
+#include <string>
+#include <atomic>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/bin_to_hex.h>
@@ -228,7 +231,7 @@ void sc::iracing::shutdown() {
     moments.clear();
 }
 
-sc::iracing::status sc::iracing::get_status() {
+const sc::iracing::status &sc::iracing::get_status() {
     return current_status;
 }
 

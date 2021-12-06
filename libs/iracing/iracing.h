@@ -1,5 +1,9 @@
 #pragma once
 
+#include <map>
+#include <atomic>
+#include <string>
+
 namespace sc::iracing {
 
     enum class status {
