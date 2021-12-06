@@ -27,6 +27,24 @@ namespace sc::iracing {
 
     static std::atomic<status> current_status = status::stopped;
 
+    std::mutex tele_members_mutex;
+    std::map<std::string, int> tele_members;
+
+    std::atomic<bool> tele_prev_valid = false;
+    std::atomic<float> tele_lap_percent = 0;
+    std::atomic<float> tele_rpm = 0, tele_rpm_prev = 0;
+    std::atomic<float> tele_speed = 0, tele_speed_prev = 0;
+    std::atomic<int> tele_gear = 0, tele_gear_prev = 0;
+
+    struct moment {
+
+        bool filled = false;
+        float rpm, speed;
+        int gear;
+    };
+
+    std::vector<moment> moments;
+
     struct variable_buffer_header {
 
         int32_t tick_count;
@@ -71,6 +89,41 @@ namespace sc::iracing {
         return sorted_buffers[1];
     }
 
+    static void process_lap_progress() {
+        const auto i = static_cast<size_t>(tele_lap_percent * static_cast<float>(moments.size()));
+        if (i < 0 || i >= moments.size()) return;
+        size_t nearest = -1;
+        for (auto j = i + 1; j < moments.size() && j < i + 1000; j++) {
+            if (moments[j].filled) {
+                nearest = j;
+                break;
+            }
+        }
+        if (nearest >= 0 && nearest < moments.size()) {
+            tele_prev_valid = true;
+            tele_rpm_prev = moments[nearest].rpm;
+            tele_speed_prev = moments[nearest].speed;
+            tele_gear_prev = moments[nearest].gear;
+        }
+        else {
+            tele_prev_valid = false;
+            const auto now = std::chrono::system_clock::now();
+            static auto last = now;
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - last).count() > 2) {
+                spdlog::info("No data ahead: {}", i);
+                last = now;
+            }
+        }
+        if (tele_speed > 5) {
+            moments[i] = {
+                true,
+                tele_rpm,
+                tele_speed,
+                tele_gear
+            };
+        }
+    }
+
     static void process_telemetry(header *telemetry_header, variable_header *variables) {
         auto variable_buffer = find_recent_valid_buffer(telemetry_header);
         for (int i = 0; i < telemetry_header->num_variables; i++) {
@@ -78,11 +131,16 @@ namespace sc::iracing {
                 auto value = reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
                 spdlog::info("RPM: {}, {}", *value, variables[i].type);
             } else if (strcmp("LapDistPct", reinterpret_cast<char *>(variables[i].name)) == 0) {
-                auto value = reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
-                spdlog::info("LapDistPct: {}, {}", *value, variables[i].type);
-            } else if (strcmp("IsOnTrack", reinterpret_cast<char *>(variables[i].name)) == 0) {
-                auto value = reinterpret_cast<uint8_t *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
-                spdlog::info("IsOnTrack: {}, {}", static_cast<int>(*value), variables[i].type);
+                tele_lap_percent = *reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
+            } else if (strcmp("Speed", reinterpret_cast<char *>(variables[i].name)) == 0) {
+                tele_speed = *reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
+                tele_speed = tele_speed * 2.2f;
+            } else if (strcmp("Gear", reinterpret_cast<char *>(variables[i].name)) == 0) {
+                tele_gear = *reinterpret_cast<int *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset);
+            } else if (strcmp("LFshockDefl", reinterpret_cast<char *>(variables[i].name)) == 0) {
+                // spdlog::info("LFshockDefl: {}", *reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset));
+            } else if (strcmp("LFshockVel_ST", reinterpret_cast<char *>(variables[i].name)) == 0) {
+                spdlog::info("LFshockVel_ST: {}", *reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(telemetry_header) + variable_buffer->data_offset + variables[i].offset));
             }
         }
     }
@@ -133,6 +191,7 @@ namespace sc::iracing {
                                         reinterpret_cast<header *>(*mapped_file_buffer),
                                         reinterpret_cast<variable_header *>(reinterpret_cast<uintptr_t>(*mapped_file_buffer) + reinterpret_cast<header *>(*mapped_file_buffer)->variables_header_offset)
                                     );
+                                    process_lap_progress();
                                 } else if (wait_res == WAIT_TIMEOUT) {
                                     current_status = status::connected;
                                 } else if (wait_res == WAIT_ABANDONED) {
@@ -154,6 +213,7 @@ namespace sc::iracing {
 
 void sc::iracing::startup() {
     shutdown();
+    moments.resize(100000);
     spdlog::debug("Starting up iRacing telemetry worker.");
     working = true;
     worker = std::thread(work);
@@ -165,8 +225,41 @@ void sc::iracing::shutdown() {
         worker.join();
         spdlog::debug("Shutdown iRacing telemetry worker.");
     }
+    moments.clear();
 }
 
 sc::iracing::status sc::iracing::get_status() {
     return current_status;
+}
+
+const std::atomic<bool> &sc::iracing::prev() {
+    return tele_prev_valid;
+}
+
+const std::atomic<float> &sc::iracing::lap_percent() {
+    return tele_lap_percent;
+}
+
+const std::atomic<float> &sc::iracing::rpm() {
+    return tele_rpm;
+}
+
+const std::atomic<float> &sc::iracing::rpm_prev() {
+    return tele_rpm_prev;
+}
+
+const std::atomic<float> &sc::iracing::speed() {
+    return tele_speed;
+}
+
+const std::atomic<float> &sc::iracing::speed_prev() {
+    return tele_speed_prev;
+}
+
+const std::atomic<int> &sc::iracing::gear() {
+    return tele_gear;
+}
+
+const std::atomic<int> &sc::iracing::gear_prev() {
+    return tele_gear_prev;
 }

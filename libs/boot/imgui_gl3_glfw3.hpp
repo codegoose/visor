@@ -36,6 +36,10 @@ static argparse::ArgumentParser program(VER_APP_NAME, VER_APP_VER);
 
 #endif
 
+#ifndef SC_FONT_SIZE
+#define SC_FONT_SIZE 16
+#endif
+
 #ifdef SC_FEATURE_SYSTEM_TRAY
 
     #include "../systray/systray.h"
@@ -59,12 +63,6 @@ using namespace gl;
 
 #include <GLFW/glfw3.h>
 
-#ifdef SC_FEATURE_TRANSPARENT_WINDOW
-
-    #include <GLFW/glfw3native.h>
-
-#endif
-
 static glm::ivec2 _sc_current_framebuffer_size = { 0, 0 };
 static bool _sc_force_redraw = false;
 
@@ -86,6 +84,10 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
         #pragma message("[EON] Using transparent framebuffer.")
         glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
         glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    #endif
+    #ifdef SC_FEATURE_FLOATING_WINDOW
+        #pragma message("[EON] Using floating window.")
+        glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
     #endif
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -134,7 +136,7 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
     });
     #ifdef SC_FEATURE_ENHANCED_FONTS
         #pragma message("[EON] Using Freetype to enhance fonts.")
-        if (!sc::font::imgui::load(16)) return "Failed to load fonts.";
+        if (!sc::font::imgui::load(SC_FONT_SIZE)) return "Failed to load fonts.";
     #endif
     #ifdef SC_FEATURE_CENTER_WINDOW
         #pragma message("[EON] Centering window.")
@@ -184,7 +186,7 @@ static tl::expected<bool, std::string> _sc_glfw_process_events(GLFWwindow *glfw_
 static void _sc_glfw_render() {
     const auto glfw_window = glfwGetCurrentContext();
     const auto draw_data = ImGui::GetDrawData();
-    glClearColor(0, 0, 0, 1);
+    glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
     if (static bool bg = program.get<bool>("--background"); !bg) {
         if (static bool shown_window = false; !shown_window) {

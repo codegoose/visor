@@ -5,8 +5,8 @@
 #define VER_COMPANY_NAME "Sim Coaches LLC"
 #define VER_LEGAL_COPYRIGHT "Sim Coaches LLC (2021)"
 #define VER_APP_NAME "Visor"
-#define VER_APP_VER "2.0.18.1152"
-#define VER_FILE_VER 2,0,18,1152
+#define VER_APP_VER "2.0.19.1170"
+#define VER_FILE_VER 2,0,19,1170
 #define VER_APP_DESCRIPTION "Sim Coaches Visor"
 
 #ifdef RC_INVOKED

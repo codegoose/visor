@@ -828,7 +828,12 @@ namespace sc::visor::gui {
                             }
                         }
                         if (enable_legacy_support && ImGui::BeginTabItem(fmt::format("{} Virtual Pedals", ICON_FA_GHOST).data())) {
-                            ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Online", ICON_FA_CHECK_DOUBLE).data());
+                            if (legacy::present()) ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Online", ICON_FA_CHECK_DOUBLE).data());
+                            else {
+                                ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Ready", ICON_FA_CHECK).data());
+                                ImGui::SameLine();
+                                ImGui::TextDisabled("No hardware detected.");
+                            }
                             const auto top_y = ImGui::GetCursorScreenPos().y;
                             if (ImGui::BeginChild("##DeviceInteractionBox", { 200, 86 }, true, ImGuiWindowFlags_MenuBar)) {
                                 if (ImGui::BeginMenuBar()) {
@@ -1076,7 +1081,7 @@ namespace sc::visor::gui {
                 if (ImGui::Selectable(fmt::format("{} Quit", ICON_FA_SKULL).data())) keep_running = false;
                 ImGui::EndMenu();
             }
-            /*
+            /*s
             if (ImGui::BeginMenu(fmt::format("{} System", ICON_FA_CALCULATOR).data())) {
                 if (!legacy_is_default) {
                     if (devices.size() || device_contexts.size()) {

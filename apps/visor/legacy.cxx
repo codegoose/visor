@@ -27,15 +27,13 @@
 std::array<sc::visor::legacy::axis_info, 4> sc::visor::legacy::axes;
 std::array<sc::visor::legacy::model, 5> sc::visor::legacy::models;
 
-std::optional<int> sc::visor::legacy::axis_i_throttle;
-std::optional<int> sc::visor::legacy::axis_i_brake;
-std::optional<int> sc::visor::legacy::axis_i_clutch;
-
 namespace sc::visor::legacy {
 
     static std::optional<PVIGEM_CLIENT> vigem_client;
     static std::optional<PVIGEM_TARGET> vigem_gamepad;
     static std::optional<DS4_REPORT> vigem_gamepad_report;
+
+    static bool found_legacy_hardware = false;
 
     static std::optional<std::filesystem::path> get_module_file_path() {
         TCHAR path[MAX_PATH];
@@ -157,9 +155,15 @@ std::optional<std::string> sc::visor::legacy::process() {
     if (!vigem_gamepad_report) {
         vigem_gamepad_report = DS4_REPORT();
         DS4_REPORT_INIT(&*vigem_gamepad_report);
+        vigem_gamepad_report->bThumbLX = 128;
+        vigem_gamepad_report->bThumbLY = 128;
+        vigem_gamepad_report->bThumbRX = 128;
+        vigem_gamepad_report->bThumbRY = 128;
+        vigem_gamepad_report->bTriggerL = 128;
+        vigem_gamepad_report->bTriggerR = 128;
         spdlog::debug("Initialized gamepad USB report structure.");
     }
-    bool found_legacy_hardware = false;
+    found_legacy_hardware = false;
     for (int i = 0; i < GLFW_JOYSTICK_LAST; i++) {
         if (!glfwJoystickPresent(i)) continue;
         if (strcmp("Sim Coaches P1 Pro Pedals", glfwGetJoystickName(i)) != 0) continue;
@@ -186,25 +190,21 @@ std::optional<std::string> sc::visor::legacy::process() {
                 value = bezier::calculate(model, value).y;
             }
             value = glm::min(value, axes[j].output_limit / 100.f);
-            if (j == 0) vigem_gamepad_report->bThumbLX = glm::round(255 * value);
-            else if (j == 1) vigem_gamepad_report->bThumbLY = glm::round(255 * value);
-            else if (j == 2) vigem_gamepad_report->bThumbRX = glm::round(255 * value);
-            else if (j == 3) vigem_gamepad_report->bThumbRY = glm::round(255 * value);
+            if (j == 0) vigem_gamepad_report->bThumbLX = 127 + glm::round(128 * value);
+            else if (j == 1) vigem_gamepad_report->bThumbLY = 127 + glm::round(128 * value);
+            else if (j == 2) vigem_gamepad_report->bThumbRX = 127 + glm::round(128 * value);
+            else if (j == 3) vigem_gamepad_report->bThumbRY = 127 + glm::round(128 * value);
             axes[j].output = value;
         }
         found_legacy_hardware = true;
         break;
     }
-    if (!found_legacy_hardware && vigem_gamepad_report) DS4_REPORT_INIT(&*vigem_gamepad_report);
-    if (!VIGEM_SUCCESS(vigem_target_ds4_update(*vigem_client, *vigem_gamepad, *vigem_gamepad_report))) {
-        disable();
-        return "Unable to update ViGEmBus gamepad.";
-    }
+    vigem_target_ds4_update(*vigem_client, *vigem_gamepad, *vigem_gamepad_report);
     return std::nullopt;
 }
 
 bool sc::visor::legacy::present() {
-    return axes.size() > 0;
+    return found_legacy_hardware;
 }
 
 std::optional<std::string> sc::visor::legacy::save_settings() {
