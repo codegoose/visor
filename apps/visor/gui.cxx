@@ -165,12 +165,12 @@ namespace sc::visor::gui {
     static void prepare_styling_parameters(ImGuiStyle &style) {
         style.WindowBorderSize = 1;
         style.FrameBorderSize = 1;
-        style.FrameRounding = 2.f;
-        style.ChildRounding = 2.f;
-        style.ScrollbarRounding = 2.f;
-        style.WindowRounding = 2.f;
-        style.GrabRounding = 2.f;
-        style.TabRounding = 2.f;
+        style.FrameRounding = 3.f;
+        style.ChildRounding = 3.f;
+        style.ScrollbarRounding = 3.f;
+        style.WindowRounding = 3.f;
+        style.GrabRounding = 3.f;
+        style.TabRounding = 3.f;
         style.Colors[ImGuiCol_ChildBg] = { .09f, .09f, .09f, 1.f };
     }
 
