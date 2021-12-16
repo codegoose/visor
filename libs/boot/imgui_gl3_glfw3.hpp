@@ -95,7 +95,7 @@ static std::optional<std::string> _sc_bootstrap(std::function<std::optional<std:
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
     #ifdef NDEBUG
-    const auto glfw_window_title = fmt::format("{} v{}", VER_APP_NAME, VER_APP_VER);
+    const auto glfw_window_title = fmt::format("{}", VER_APP_NAME, VER_APP_VER);
     #else
     const auto glfw_window_title = fmt::format("{} v{} (Development Build)", VER_APP_NAME, VER_APP_VER);
     #endif
