@@ -14,14 +14,6 @@
 
 #include <iostream>
 
-static void prepare_styling(ImGuiStyle &style) {
-
-}
-
-static void prepare_styling_parameters(ImGuiStyle &style) {
-
-}
-
 static std::optional<std::string> sc::boot::on_startup() {
     auto &style = ImGui::GetStyle();
     style.Colors[ImGuiCol_Tab] = { 50.f / 255.f, 50.f / 255.f, 50.f / 255.f, 1.f };
