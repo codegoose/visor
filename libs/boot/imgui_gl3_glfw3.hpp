@@ -188,7 +188,11 @@ static void _sc_glfw_render() {
     const auto draw_data = ImGui::GetDrawData();
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
+    #ifdef SC_FEATURE_SYSTEM_TRAY
     if (static bool bg = program.get<bool>("--background"); !bg) {
+    #else
+    {
+    #endif
         if (static bool shown_window = false; !shown_window) {
             spdlog::debug("First render complete. Making window visible.");
             glfwShowWindow(glfw_window);
@@ -346,7 +350,9 @@ static void _sc_print_publisher_info(int arg_c, char **arg_v) {
 }
 
 static int _sc_entry_point(int arg_c, char **arg_v) {
+    #ifdef SC_FEATURE_SYSTEM_TRAY
     program.add_argument("--background").help("start in system tray, not visible").default_value(false).implicit_value(true);
+    #endif
     try {
         program.parse_args(arg_c, arg_v);
     } catch (const std::runtime_error &err) {
