@@ -28,6 +28,22 @@ icecream-cpp/0.3.1
 [options]
 
 botan:amalgamation=False
+botan:shared=True
+brotli:shared=True
+bzip2:shared=True
+enet:shared=True
+fmt:shared=True
+freetype:shared=True
+glbinding:shared=True
+glfw:shared=True
+libcurl:shared=True
+libpng:shared=True
+openssl:shared=True
+pystring:shared=True
+sentry-native:shared=True
+spdlog:shared=True
+yaml-cpp:shared=True
+zlib:shared=True
 
 [generators]
 
