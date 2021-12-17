@@ -10,7 +10,7 @@ build_type = 'RelWithDebInfo' if is_rel else 'Debug'
 
 commands = [
     ['conan', 'install', '..', '-s', 'build_type=%s' % build_type, '--build=missing'],
-    ['cmake', '..', '-DCMAKE_BUILD_TYPE=%s' % build_type],
+    ['cmake', '-G', 'Ninja', '..', '-DCMAKE_BUILD_TYPE=%s' % build_type],
     ['cmake', '--build', '.', '--config', build_type]
 ]
 
