@@ -35,6 +35,14 @@ bool sc::font::imgui::load(const int &size) {
             return false;
         }
     }
+    {
+        ImFontConfig font_config;
+        font_config.FontDataOwnedByAtlas = false;
+        if (static const auto rsc_font_mono = resource::get_resource("DATA", "FONT_MONO"); !rsc_font_mono || !ImGui::GetIO().Fonts->AddFontFromMemoryTTF(rsc_font_mono->first, rsc_font_mono->second, size - 5, &font_config)) {
+            spdlog::error("Unable to load monospace font.");
+            return false;
+        }
+    }
     spdlog::debug("All fonts have been loaded.");
     return true;
 }
