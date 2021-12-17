@@ -16,5 +16,4 @@ target_link_libraries(template
     font
 )
 
-# win32_require_admin(template)
 win32_release_mode_no_console(template)
