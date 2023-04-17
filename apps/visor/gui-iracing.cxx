@@ -17,31 +17,31 @@ void sc::visor::gui::iracing::shutdown() {
 
 void sc::visor::gui::iracing::emit_content() {
     if (ImGui::BeginTabBar("iRacingTabBar")) {
-        if (ImGui::BeginTabItem(fmt::format("{} Telemetry", ICON_FA_SIGNAL_STREAM).data())) {
+        if (ImGui::BeginTabItem(fmt::format("{} Telemetry", ICON_FA_SIGNAL_STREAM).c_str())) {
             switch (sc::iracing::get_status()) {
                 case sc::iracing::status::connected:
-                    ImGui::TextColored({ 0.f, 1.f, 0.f, 1.f }, fmt::format("{} Connected", ICON_FA_CHECK).data());
+                    ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), fmt::format("{} Connected", ICON_FA_CHECK).c_str());
                     break;
                 case sc::iracing::status::live:
-                    ImGui::TextColored({ 0.f, 1.f, 0.f, 1.f }, fmt::format("{} Live", ICON_FA_CHECK_DOUBLE).data());
+                    ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), fmt::format("{} Live", ICON_FA_CHECK_DOUBLE).c_str());
                     break;
                 case sc::iracing::status::searching:
-                    ImGui::TextDisabled(fmt::format("{} Searching", ICON_FA_SEARCH).data());
+                    ImGui::TextDisabled(fmt::format("{} Searching", ICON_FA_SEARCH).c_str());
                     break;
                 case sc::iracing::status::stopped:
-                    ImGui::TextDisabled(fmt::format("{} Paused", ICON_FA_PAUSE).data());
+                    ImGui::TextDisabled(fmt::format("{} Paused", ICON_FA_PAUSE).c_str());
                     break;
             }
             ImGui::ProgressBar(sc::iracing::lap_percent());
-            ImGui::Text(fmt::format("Lap: {}%", sc::iracing::lap_percent()).data());
-            ImGui::Text(fmt::format("RPM: {}", sc::iracing::rpm()).data());
-            ImGui::Text(fmt::format("Speed: {}", sc::iracing::speed()).data());
-            ImGui::Text(fmt::format("Gear: {}", sc::iracing::gear()).data());
-            if (ImGui::BeginChild("TelemetryVariables", { 0, 0 }, true)) {
-                for (auto &var : sc::iracing::variables()) {
-                    ImGui::Text(var.first.data());
+            ImGui::Text(fmt::format("Lap: {:.1f}%", sc::iracing::lap_percent()).c_str());
+            ImGui::Text(fmt::format("RPM: {:.0f}", sc::iracing::rpm()).c_str());
+            ImGui::Text(fmt::format("Speed: {:.0f} mph", sc::iracing::speed()).c_str());
+            ImGui::Text(fmt::format("Gear: {}", sc::iracing::gear()).c_str());
+            if (ImGui::BeginChild("TelemetryVariables", ImVec2(0, 0), true)) {
+                for (const auto& [name, type] : sc::iracing::variables()) {
+                    ImGui::Text(name.c_str());
                     ImGui::SameLine();
-                    ImGui::TextDisabled(fmt::format("Type: {}", var.second).data());
+                    ImGui::TextDisabled(fmt::format("Type: {}", type).c_str());
                 }
                 ImGui::EndChild();
             }
