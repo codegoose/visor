@@ -6,14 +6,14 @@
     <ROW Property="AI_CONTROL_VISUAL_STYLE" Value="2960685;4276545;6776679;16176031" MsiKey="AI_CONTROL_VISUAL_STYLE"/>
     <ROW Property="AI_CONTROL_VISUAL_STYLE_EX" Value="1513239;3026478;3026478" MsiKey="AI_CONTROL_VISUAL_STYLE_EX"/>
     <ROW Property="AI_CONTROL_VISUAL_STYLE_FLAT" MsiKey="AI_CONTROL_VISUAL_STYLE_FLAT"/>
-    <ROW Property="AI_CURRENT_YEAR" Value="2021" ValueLocId="-"/>
+    <ROW Property="AI_CURRENT_YEAR" Value="2023" ValueLocId="-"/>
     <ROW Property="AI_EXTERNALUIUNINSTALLERNAME" MultiBuildValue="DefaultBuild:aiui"/>
     <ROW Property="AI_FINDEXE_TITLE" Value="Select the installation package for [|ProductName]" ValueLocId="AI.Property.FindExeTitle"/>
     <ROW Property="AI_FrameBtnsColor" Value="metroblack" MsiKey="AI_FrameBtnsColor"/>
     <ROW Property="AI_FrameColor" Value="metroblack" MsiKey="AI_FrameColor"/>
     <ROW Property="AI_NO_BORDER_NORMAL" MultiBuildValue="DefaultBuild:1" MsiKey="AI_NO_BORDER_NORMAL"/>
     <ROW Property="AI_PREDEF_LCONDS_PROPS" Value="AI_DETECTED_INTERNET_CONNECTION"/>
-    <ROW Property="AI_PRODUCTNAME_ARP" Value="Sim Coaches Visor"/>
+    <ROW Property="AI_PRODUCTNAME_ARP" Value="Visor"/>
     <ROW Property="AI_PROPPATH_PERBUILD_visor.exe" Value="build_rel\bin\visor.exe"/>
     <ROW Property="AI_ThemeStyle" Value="default" MsiKey="AI_ThemeStyle"/>
     <ROW Property="AI_ThemeStyleEx" Value="border" MultiBuildValue="DefaultBuild:flat" MsiKey="AI_ThemeStyleEx"/>
@@ -411,9 +411,9 @@
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiShortsComponent">
     <ROW Shortcut="SimCoachesCleanupTool" Directory_="ProgramMenuFolder" Name="SIMCOA~2|Sim Coaches Cleanup Tool" Component_="cleanup.exe" Target="[#cleanup.exe]" Description="Remove legacy Sim Coaches software." Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="APPDIR"/>
-    <ROW Shortcut="SimCoachesVisor" Directory_="ProgramMenuFolder" Name="SIMCOA~1|Sim Coaches Visor" Component_="visor.exe" Target="[#visor.exe]" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
-    <ROW Shortcut="SimCoachesVisor_1" Directory_="DesktopFolder" Name="SIMCOA~1|Sim Coaches Visor" Component_="visor.exe" Target="[#visor.exe]" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
-    <ROW Shortcut="SimCoachesVisor_2" Directory_="StartupFolder" Name="SIMCOA~1|Sim Coaches Visor" Component_="visor.exe" Target="[#visor.exe]" Arguments="--background" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
+    <ROW Shortcut="SimCoachesVisor" Directory_="ProgramMenuFolder" Name="SIMCOA~1|Visor" Component_="visor.exe" Target="[#visor.exe]" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
+    <ROW Shortcut="SimCoachesVisor_1" Directory_="DesktopFolder" Name="SIMCOA~1|Visor" Component_="visor.exe" Target="[#visor.exe]" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
+    <ROW Shortcut="SimCoachesVisor_2" Directory_="StartupFolder" Name="SIMCOA~1|Visor" Component_="visor.exe" Target="[#visor.exe]" Arguments="--background" Hotkey="0" IconIndex="0" ShowCmd="1" WkDir="Visor_Dir"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiTextStyleComponent">
     <ROW TextStyle="BrandingStyle" FaceName="Segoe UI" Size="8" Color="2171376" MultiBuildColor="DefaultBuild:2565927" StyleBits="0" MsiKey="BrandingStyle"/>
