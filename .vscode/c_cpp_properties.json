@@ -1,15 +1,15 @@
 {
     "configurations": [
         {
-            "name": "Default",
-            "cppStandard": "c++17",
-            "includePath": [
-
+            "name": "Default", // Name of the configuration
+            "cppStandard": "c++17", // C++ language standard to use
+            "includePath": [ // List of include paths for header files
+                // Add include paths here
             ],
-            "defines": [
-
+            "defines": [ // List of preprocessor definitions
+                // Add preprocessor definitions here
             ]
         }
     ],
-    "version": 4
+    "version": 4 // Version of the configuration file
 }
