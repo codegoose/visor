@@ -2,44 +2,44 @@
 #pragma once
 #endif
 
-#define VER_COMPANY_NAME "Sim Coaches LLC"
-#define VER_LEGAL_COPYRIGHT "Sim Coaches LLC (2021)"
-#define VER_APP_NAME "Cleanup"
-#define VER_APP_VER "1.0.0.0"
-#define VER_FILE_VER 1,0,0,0
-#define VER_APP_DESCRIPTION "Sim Coaches Cleanup Tool"
+#define VER_COMPANY_NAME "Sim Coaches LLC" // The name of the company is "Sim Coaches LLC"
+#define VER_LEGAL_COPYRIGHT "Sim Coaches LLC (2021)" // The legal copyright information for the company
+#define VER_APP_NAME "Cleanup" // The name of the application is "Cleanup"
+#define VER_APP_VER "1.0.0.0" // The version of the application
+#define VER_FILE_VER 1,0,0,0 // The file version
+#define VER_APP_DESCRIPTION "Sim Coaches Cleanup Tool" // The description of the application
 
-#ifdef RC_INVOKED
+#ifdef RC_INVOKED // Checks if the resource compiler is being invoked
 
-#include <windows.h>
+#include <windows.h> // Include the Windows header file
 
-GLFW_ICON ICON "main.ico"
+GLFW_ICON ICON "main.ico" // Specifies the icon for the application
 
-VS_VERSION_INFO VERSIONINFO
-FILEVERSION VER_FILE_VER
-PRODUCTVERSION VER_FILE_VER
-FILEFLAGSMASK 0x3fL
-FILEOS 0x40004L
-FILETYPE 0x1L
-FILESUBTYPE 0x0L
+VS_VERSION_INFO VERSIONINFO // Defines the version information structure
+FILEVERSION VER_FILE_VER // Specifies the file version
+PRODUCTVERSION VER_FILE_VER // Specifies the product version
+FILEFLAGSMASK 0x3fL // Specifies the file flags mask
+FILEOS 0x40004L // Specifies the file operating system
+FILETYPE 0x1L // Specifies the file type
+FILESUBTYPE 0x0L // Specifies the file subtype
 
+BEGIN // Begins the version information block
+BLOCK "StringFileInfo" // Begins the string table block
 BEGIN
-BLOCK "StringFileInfo"
+BLOCK "040904B0" // Begins the language block
 BEGIN
-BLOCK "040904B0"
+VALUE "CompanyName", VER_COMPANY_NAME // Specifies the value of the CompanyName
+VALUE "LegalCopyright", VER_LEGAL_COPYRIGHT // Specifies the value of the LegalCopyright
+VALUE "ProductName", VER_APP_NAME // Specifies the value of the ProductName
+VALUE "ProductVersion", VER_APP_VER // Specifies the value of the ProductVersion
+VALUE "FileVersion", VER_APP_VER // Specifies the value of the FileVersion
+VALUE "FileDescription", VER_APP_DESCRIPTION // Specifies the value of the FileDescription
+END // Ends the language block
+END // Ends the string table block
+BLOCK "VarFileInfo" // Begins the variable information block
 BEGIN
-VALUE "CompanyName", VER_COMPANY_NAME
-VALUE "LegalCopyright", VER_LEGAL_COPYRIGHT
-VALUE "ProductName", VER_APP_NAME
-VALUE "ProductVersion", VER_APP_VER
-VALUE "FileVersion", VER_APP_VER
-VALUE "FileDescription", VER_APP_DESCRIPTION
-END
-END
-BLOCK "VarFileInfo"
-BEGIN
-VALUE "Translation", 0x409, 1200
-END
-END
+VALUE "Translation", 0x409, 1200 // Specifies the translation value
+END // Ends the variable information block
+END // Ends the version information block
 
 #endif
