@@ -2,46 +2,46 @@
 #pragma once
 #endif
 
-#define VER_COMPANY_NAME "Sim Coaches LLC"
-#define VER_LEGAL_COPYRIGHT "Sim Coaches LLC (2021)"
-#define VER_APP_NAME "Template"
-#define VER_APP_VER "1.0.0.0"
-#define VER_FILE_VER 1,0,0,0
-#define VER_APP_DESCRIPTION "Sim Coaches Example Application"
+#define VER_COMPANY_NAME "Sim Coaches LLC" // Define the company name as "Sim Coaches LLC"
+#define VER_LEGAL_COPYRIGHT "Sim Coaches LLC (2021)" // Define the legal copyright as "Sim Coaches LLC (2021)"
+#define VER_APP_NAME "Template" // Define the application name as "Template"
+#define VER_APP_VER "1.0.0.0" // Define the application version as "1.0.0.0"
+#define VER_FILE_VER 1,0,0,0 // Define the file version as 1.0.0.0
+#define VER_APP_DESCRIPTION "Sim Coaches Example Application" // Define the application description as "Sim Coaches Example Application"
 
-#ifdef RC_INVOKED
+#ifdef RC_INVOKED // Check if the resource compiler is being invoked
 
-#include <windows.h>
+#include <windows.h> // Include the Windows header file
 
-GLFW_ICON ICON "main.ico"
+GLFW_ICON ICON "main.ico" // Set the icon for the application
 
-#include "..\\..\\libs\\font\\resources.rc"
+#include "..\\..\\libs\\font\\resources.rc" // Include the resource file for fonts
 
-VS_VERSION_INFO VERSIONINFO
-FILEVERSION VER_FILE_VER
-PRODUCTVERSION VER_FILE_VER
-FILEFLAGSMASK 0x3fL
-FILEOS 0x40004L
-FILETYPE 0x1L
-FILESUBTYPE 0x0L
+VS_VERSION_INFO VERSIONINFO // Define the version information
+FILEVERSION VER_FILE_VER // Set the file version
+PRODUCTVERSION VER_FILE_VER // Set the product version
+FILEFLAGSMASK 0x3fL // Set the file flags mask
+FILEOS 0x40004L // Set the file operating system
+FILETYPE 0x1L // Set the file type
+FILESUBTYPE 0x0L // Set the file subtype
 
+BEGIN // Begin the version information block
+BLOCK "StringFileInfo" // Begin the string table block
 BEGIN
-BLOCK "StringFileInfo"
+BLOCK "040904B0" // Begin the language block
 BEGIN
-BLOCK "040904B0"
+VALUE "CompanyName", VER_COMPANY_NAME // Set the value of the CompanyName
+VALUE "LegalCopyright", VER_LEGAL_COPYRIGHT // Set the value of the LegalCopyright
+VALUE "ProductName", VER_APP_NAME // Set the value of the ProductName
+VALUE "ProductVersion", VER_APP_VER // Set the value of the ProductVersion
+VALUE "FileVersion", VER_APP_VER // Set the value of the FileVersion
+VALUE "FileDescription", VER_APP_DESCRIPTION // Set the value of the FileDescription
+END // End the language block
+END // End the string table block
+BLOCK "VarFileInfo" // Begin the variable information block
 BEGIN
-VALUE "CompanyName", VER_COMPANY_NAME
-VALUE "LegalCopyright", VER_LEGAL_COPYRIGHT
-VALUE "ProductName", VER_APP_NAME
-VALUE "ProductVersion", VER_APP_VER
-VALUE "FileVersion", VER_APP_VER
-VALUE "FileDescription", VER_APP_DESCRIPTION
-END
-END
-BLOCK "VarFileInfo"
-BEGIN
-VALUE "Translation", 0x409, 1200
-END
-END
+VALUE "Translation", 0x409, 1200 // Set the translation value
+END // End the variable information block
+END // End the version information block
 
 #endif
