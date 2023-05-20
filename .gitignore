@@ -1,5 +1,14 @@
+# Ignore the .vscode/ directory
 .vscode/
+
+# Ignore the build/ directory
 build/
+
+# Ignore the build_rel/ directory
 build_rel/
+
+# Ignore the installer-cache/ directory
 installer-cache/
+
+# Ignore the bin/ directory
 bin/
