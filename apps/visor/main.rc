@@ -2,51 +2,52 @@
 #pragma once
 #endif
 
-#define VER_COMPANY_NAME "Sim Coaches LLC"
-#define VER_LEGAL_COPYRIGHT "Sim Coaches LLC (2021)"
-#define VER_APP_NAME "Visor"
-#define VER_APP_VER "2.0.19.1170"
-#define VER_FILE_VER 2,0,19,1170
-#define VER_APP_DESCRIPTION "Sim Coaches Visor"
+#define VER_COMPANY_NAME "Sim Coaches LLC" // Define the company name for the version information
+#define VER_LEGAL_COPYRIGHT "Sim Coaches LLC (2021)" // Define the legal copyright for the version information
+#define VER_APP_NAME "Visor" // Define the application name for the version information
+#define VER_APP_VER "2.0.19.1170" // Define the application version for the version information
+#define VER_FILE_VER 2,0,19,1170 // Define the file version for the version information
+#define VER_APP_DESCRIPTION "Sim Coaches Visor" // Define the application description for the version information
 
 #ifdef RC_INVOKED
 
 #include <windows.h>
 
-GLFW_ICON ICON "main.ico"
-TRAY_ICON ICON "main.ico"
+GLFW_ICON ICON "main.ico" // Define the icon for GLFW (graphics library)
+TRAY_ICON ICON "main.ico" // Define the icon for the system tray
 
-#include "..\\..\\libs\\font\\resources.rc"
+#include "..\\..\\libs\\font\\resources.rc" // Include the resources for fonts
 
-LOTTIE_LOADING DATA "resources\\57-loading-semicircle.json"
-LOTTIE_COMMUNICATING DATA "resources\\41611-interactive-digital-assistant.json"
-LOTTIE_UNDER_CONSTRUCTION DATA "resources\\80248-under-construction.json"
+LOTTIE_LOADING DATA "resources\\57-loading-semicircle.json" // Define the loading animation data
+LOTTIE_COMMUNICATING DATA "resources\\41611-interactive-digital-assistant.json" // Define the communicating animation data
+LOTTIE_UNDER_CONSTRUCTION DATA "resources\\80248-under-construction.json" // Define the under construction animation data
 
-VS_VERSION_INFO VERSIONINFO
-FILEVERSION VER_FILE_VER
-PRODUCTVERSION VER_FILE_VER
-FILEFLAGSMASK 0x3fL
-FILEOS 0x40004L
-FILETYPE 0x1L
-FILESUBTYPE 0x0L
+VS_VERSION_INFO VERSIONINFO // Start the version information block
+FILEVERSION VER_FILE_VER // Set the file version
+PRODUCTVERSION VER_FILE_VER // Set the product version
+FILEFLAGSMASK 0x3fL // Set the file flags mask
+FILEOS 0x40004L // Set the file operating system
+FILETYPE 0x1L // Set the file type
+FILESUBTYPE 0x0L // Set the file subtype
 
+BEGIN // Start the block for string file information
+BLOCK "StringFileInfo" // Start the block for string file information
 BEGIN
-BLOCK "StringFileInfo"
+BLOCK "040904B0" // Start the block for language-specific string file information
 BEGIN
-BLOCK "040904B0"
+VALUE "CompanyName", VER_COMPANY_NAME // Set the company name value
+VALUE "LegalCopyright", VER_LEGAL_COPYRIGHT // Set the legal copyright value
+VALUE "ProductName", VER_APP_NAME // Set the product name value
+VALUE "ProductVersion", VER_APP_VER // Set the product version value
+VALUE "FileVersion", VER_APP_VER // Set the file version value
+VALUE "FileDescription", VER_APP_DESCRIPTION // Set the file description value
+END // End the block for language-specific string file information
+END // End the block for string file information
+
+BLOCK "VarFileInfo" // Start the block for variable file information
 BEGIN
-VALUE "CompanyName", VER_COMPANY_NAME
-VALUE "LegalCopyright", VER_LEGAL_COPYRIGHT
-VALUE "ProductName", VER_APP_NAME
-VALUE "ProductVersion", VER_APP_VER
-VALUE "FileVersion", VER_APP_VER
-VALUE "FileDescription", VER_APP_DESCRIPTION
-END
-END
-BLOCK "VarFileInfo"
-BEGIN
-VALUE "Translation", 0x409, 1200
-END
-END
+VALUE "Translation", 0x409, 1200 // Set the translation value
+END // End the block for variable file information
+END // End the version information block
 
 #endif
