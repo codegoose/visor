@@ -1,20 +1,20 @@
+// Include the gui-iracing.h header file, which likely contains the declarations of the methods being defined here.
 #include "gui-iracing.h"
-// This includes the gui-iracing.h header file, which likely contains the declarations of the methods being defined here.
 
+// Include the imgui.h header file, which is the main header file for the Dear ImGui library, a popular library for creating graphical user interfaces in C++.
 #include <imgui.h>
-// This includes the imgui.h header file, which is the main header file for the Dear ImGui library, a popular library for creating graphical user interfaces in C++.
 
+// Include the spdlog.h header file, which is the main header file for the spdlog library, a fast C++ logging library.
 #include <spdlog/spdlog.h>
-// This includes the spdlog.h header file, which is the main header file for the spdlog library, a fast C++ logging library.
 
+// Include the magic_enum.hpp header file, which is the main header file for the magic_enum library, a static reflection library in C++ for enums.
 #include <magic_enum.hpp>
-// This includes the magic_enum.hpp header file, which is the main header file for the magic_enum library, a static reflection library in C++ for enums.
 
+// Include a custom imgui.h header file, which likely contains some customizations or additions for using fonts with ImGui.
 #include "../../libs/font/imgui.h"
-// This includes a custom imgui.h header file, which likely contains some customizations or additions for using fonts with ImGui.
 
+// Include the iracing.h header file, which likely contains declarations for interacting with the iRacing API.
 #include "../../libs/iracing/iracing.h"
-// This includes the iracing.h header file, which likely contains declarations for interacting with the iRacing API.
 
 void sc::visor::gui::iracing::startup() {
     // This is an empty method named 'startup'. It might be a placeholder for initialization tasks to be added later.
@@ -64,7 +64,6 @@ void sc::visor::gui::iracing::emit_content() {
             // This displays the current lap percentage as text.
 
             ImGui::Text(fmt::format("RPM: {}", sc::iracing::rpm()).data());
-           ```c++
             // This displays the current RPM (Revolutions per Minute) as text.
 
             ImGui::Text(fmt::format("Speed: {}", sc::iracing::speed()).data());
