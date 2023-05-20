@@ -1,19 +1,20 @@
 add_executable(template
-    "main.rc"
-    "main.cxx"
+    "main.rc" // Include the main resource file
+    "main.cxx" // Source file for the main program
 )
 
 target_link_libraries(template
-    CONAN_PKG::fmt
-    CONAN_PKG::glm
-    CONAN_PKG::imgui
-    CONAN_PKG::argparse
-    CONAN_PKG::pystring
-    CONAN_PKG::tl-expected
+    CONAN_PKG::fmt // Link the fmt package
+    CONAN_PKG::glm // Link the glm package
+    CONAN_PKG::imgui // Link the imgui package
+    CONAN_PKG::argparse // Link the argparse package
+    CONAN_PKG::pystring // Link the pystring package
+    CONAN_PKG::tl-expected // Link the tl-expected package
 
-    boot
-    imgui
-    font
+    boot // Link the boot library
+    imgui // Link the imgui library
+    font // Link the font library
 )
 
-win32_release_mode_no_console(template)
+win32_release_mode_no_console(template) // Set the Win32 release mode to not display a console window for the "template" executable
+
