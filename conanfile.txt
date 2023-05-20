@@ -1,55 +1,55 @@
 [requires]
 
-stb/cci.20210713
-tl-expected/20190710
-sentry-native/0.4.12
-freetype/2.10.4
-spdlog/1.9.2
-fmt/8.0.1
-glfw/3.3.5
-glm/0.9.9.8
-imgui/1.85
-imguizmo/cci.20210223
-implot/0.11
-sol2/3.2.3
-libcurl/7.79.1
-pystring/1.1.3
-nlohmann_json/3.10.4
-botan/2.18.1
-indicators/2.2
-glbinding/3.1.0
-yaml-cpp/0.7.0
-magic_enum/0.7.3
-argparse/2.2
-functionalplus/0.2.16
-enet/1.3.17
-icecream-cpp/0.3.1
+stb/cci.20210713  # Requires the stb library version cci.20210713
+tl-expected/20190710  # Requires the tl-expected library version 20190710
+sentry-native/0.4.12  # Requires the sentry-native library version 0.4.12
+freetype/2.10.4  # Requires the freetype library version 2.10.4
+spdlog/1.9.2  # Requires the spdlog library version 1.9.2
+fmt/8.0.1  # Requires the fmt library version 8.0.1
+glfw/3.3.5  # Requires the glfw library version 3.3.5
+glm/0.9.9.8  # Requires the glm library version 0.9.9.8
+imgui/1.85  # Requires the imgui library version 1.85
+imguizmo/cci.20210223  # Requires the imguizmo library version cci.20210223
+implot/0.11  # Requires the implot library version 0.11
+sol2/3.2.3  # Requires the sol2 library version 3.2.3
+libcurl/7.79.1  # Requires the libcurl library version 7.79.1
+pystring/1.1.3  # Requires the pystring library version 1.1.3
+nlohmann_json/3.10.4  # Requires the nlohmann_json library version 3.10.4
+botan/2.18.1  # Requires the botan library version 2.18.1
+indicators/2.2  # Requires the indicators library version 2.2
+glbinding/3.1.0  # Requires the glbinding library version 3.1.0
+yaml-cpp/0.7.0  # Requires the yaml-cpp library version 0.7.0
+magic_enum/0.7.3  # Requires the magic_enum library version 0.7.3
+argparse/2.2  # Requires the argparse library version 2.2
+functionalplus/0.2.16  # Requires the functionalplus library version 0.2.16
+enet/1.3.17  # Requires the enet library version 1.3.17
+icecream-cpp/0.3.1  # Requires the icecream-cpp library version 0.3.1
 
 [imports]
 
-bin, *.dll -> ./bin
-., license* -> ./licenses @ folder=True, ignore_case=True
+bin, *.dll -> ./bin  # Imports binary files and DLLs into the "./bin" directory
+., license* -> ./licenses @ folder=True, ignore_case=True  # Imports files matching "license*" and the current directory (".") into the "./licenses" directory with folder=True and ignore_case=True options
 
 [options]
 
-botan:amalgamation=False
-botan:shared=True
-brotli:shared=True
-bzip2:shared=True
-enet:shared=True
-fmt:shared=True
-freetype:shared=True
-glbinding:shared=True
-glfw:shared=True
-libcurl:shared=True
-libpng:shared=True
-openssl:shared=True
-pystring:shared=True
-sentry-native:shared=True
-spdlog:shared=True
-yaml-cpp:shared=True
-zlib:shared=True
+botan:amalgamation=False  # Sets the option amalgamation to False for the botan library
+botan:shared=True  # Sets the option shared to True for the botan library
+brotli:shared=True  # Sets the option shared to True for the brotli library
+bzip2:shared=True  # Sets the option shared to True for the bzip2 library
+enet:shared=True  # Sets the option shared to True for the enet library
+fmt:shared=True  # Sets the option shared to True for the fmt library
+freetype:shared=True  # Sets the option shared to True for the freetype library
+glbinding:shared=True  # Sets the option shared to True for the glbinding library
+glfw:shared=True  # Sets the option shared to True for the glfw library
+libcurl:shared=True  # Sets the option shared to True for the libcurl library
+libpng:shared=True  # Sets the option shared to True for the libpng library
+openssl:shared=True  # Sets the option shared to True for the openssl library
+pystring:shared=True  # Sets the option shared to True for the pystring library
+sentry-native:shared=True  # Sets the option shared to True for the sentry-native library
+spdlog:shared=True  # Sets the option shared to True for the spdlog library
+yaml-cpp:shared=True  # Sets the option shared to True for the yaml-cpp library
+zlib:shared=True  # Sets the option shared to True for the zlib library
 
 [generators]
 
-cmake
+cmake  # Uses the CMake generator for building the project
