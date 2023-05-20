@@ -1,45 +1,56 @@
-// Include the header file for the animation_instance class
 #include "animation_instance.h"
+// This includes the animation_instance.h header file, which contains the definition of the animation_instance structure.
 
-// This function updates the state of the animation instance
 bool sc::animation_instance::update() {
-    // Initialize a flag to indicate whether the animation frame has changed
+    // This function updates the state of an animation_instance. It returns a boolean indicating whether the animation frame has changed.
+
     bool changed = false;
+    // This flag is set to true if the frame of the animation changes during this update.
 
-    // Get the current time
     const auto now = std::chrono::high_resolution_clock::now();
+    // This gets the current time.
 
-    // Calculate the elapsed time since the last update
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update);
+    // This calculates the time elapsed since the last update, in milliseconds.
 
-    // Update the last update time
     last_update = now;
+    // This updates the last_update time point to the current time.
 
-    // If the animation is set to play and is not currently playing, initialize the time and set the playing flag
     if (play && !playing) {
+        // If the animation is set to play and is not currently playing...
+
         time = 0;
+        // ...reset the animation time to 0...
+
         playing = true;
+        // ...start the animation playing...
+
         play = false;
+        // ...and reset the play flag.
     }
-
-    // If the animation is playing, update the time and frame index
+    
     if (playing) {
-        // Calculate the time delta
+        // If the animation is currently playing...
+
         const double delta = static_cast<double>(elapsed.count()) / 1000.0;
+        // ...calculate the time delta since the last update, in seconds...
 
-        // Update the time
         time += delta;
+        // ...and add the delta to the animation time.
 
-        // Calculate the new frame index
         if (const auto res = texture::frame_sequence::plot_frame_index(frame_rate, frames.size(), time, loop); res && frame_i != *res) {
+            // If the result of the frame_sequence's plot_frame_index function is a valid frame index that is different from the current frame index...
+
             frame_i = *res;
+            // ...update the frame index...
+
             changed = true;
+            // ...and set the changed flag to true.
         }
-
-        // If the animation is not looping and has reached the last frame, stop playing
         if (!loop && frame_i == frames.size() - 1) playing = false;
+        // If the animation is not set to loop and the current frame is the last frame, stop the animation.
     }
-
-    // Return whether the animation frame has changed
+    
     return changed;
+    // Return the changed flag, indicating whether the animation frame has changed during this update.
 }
