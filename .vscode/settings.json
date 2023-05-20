@@ -1,6 +1,3 @@
 {
-    "C_Cpp.autoAddFileAssociations": false,
-    "githubPullRequests.ignoredPullRequestBranches": [
-        "pub"
-    ]
+    "C_Cpp.autoAddFileAssociations": false
 }
