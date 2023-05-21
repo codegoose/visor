@@ -29,7 +29,7 @@
     <ROW Property="ProductCode" Value="1033:{43BFDF68-0D86-43DD-859D-5580FCD569B9} " Type="16"/>
     <ROW Property="ProductLanguage" Value="1033"/>
     <ROW Property="ProductName" Value="Visor"/>
-    <ROW Property="ProductVersion" Value="2.0.19.1170" Type="32" TargetFile="visor.exe"/>
+    <ROW Property="ProductVersion" Value="2.0.19.1172" Type="32" TargetFile="visor.exe"/>
     <ROW Property="SecureCustomProperties" Value="OLDPRODUCTS;AI_NEWERPRODUCTFOUND;AI_SETUPEXEPATH;SETUPEXEDIR"/>
     <ROW Property="UpgradeCode" Value="{B2C8F591-943D-452B-B229-C9896A334F91}"/>
     <ROW Property="WindowsType9X" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
