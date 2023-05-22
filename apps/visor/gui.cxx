@@ -3,6 +3,7 @@
 #include "animation_instance.h"  // Include animation instance header file
 #include "device_context.h"  // Include device context header file
 #include "legacy.h"  // Include legacy header file
+#include "gui-iRacing.h"  // Include the iRacing GUI header file
 
 #include <string_view>  // Include header for string views
 #include <array>  // Include header for arrays
