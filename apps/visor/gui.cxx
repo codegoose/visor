@@ -1315,13 +1315,17 @@ ImGui::EndTabBar();
 ImGui::EndTabItem();
 }
 
-// Commented out code
-/*
+// Begin a new tab item with the title "iRacing". The icon is set using a font awesome icon.
 if (ImGui::BeginTabItem(fmt::format("{} iRacing", ICON_FA_FLAG_CHECKERED).data())) {
+    
+    // Display the current status of the iRacing connection as text.
+    // The status is retrieved using the get_status() function from the iracing namespace.
+    // The status is converted to a string using the magic_enum::enum_name() function.
     ImGui::Text(fmt::format("Status: {}", magic_enum::enum_name(iracing::get_status())).data());
+    
+    // End the tab item.
     ImGui::EndTabItem();
 }
-*/
 
 // End the tab bar
 ImGui::EndTabBar();
