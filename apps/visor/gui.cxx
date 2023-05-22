@@ -831,6 +831,19 @@ else {
   ImGui::TextColored({ .2f, 1, .2f, 1 }, fmt::format("{} Logged In", ICON_FA_CHECK_DOUBLE).data()); // Display the "Logged In" text in colored format
   ImGui::SameLine(); // Move the cursor to the same line
   ImGui::TextDisabled(fmt::format("({}, Token: {})", *account_person_name, *account_session_token).data()); // Display the person's name and session token in disabled format
+
+  // Start of new code
+  /*
+  // Username field
+  static char username[32] = ""; // Buffer for the username
+  if (*account_username) { // If the user already has a username
+    ImGui::Text("Username: %s", *account_username); // Display the username
+  } else { // If the user doesn't have a username
+    ImGui::InputText("Username", username, IM_ARRAYSIZE(username)); // Display an editable text field for the username
+  }
+  */
+  // End of new code
+
   animation_under_construction.playing = true; // Set the playing flag of the animation_under_construction to true
   animation_under_construction.loop = true; // Set the loop flag of the animation_under_construction to true
   ImPenUtility pen; // Create an ImPenUtility object
