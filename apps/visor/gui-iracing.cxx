@@ -17,11 +17,13 @@
 #include "../../libs/iracing/iracing.h"
 
 void sc::visor::gui::iracing::startup() {
-    // This is an empty method named 'startup'. It might be a placeholder for initialization tasks to be added later.
+    sc::iracing::startup();
+    // Additional GUI-specific startup tasks could go here
 }
 
 void sc::visor::gui::iracing::shutdown() {
-    // This is an empty method named 'shutdown'. It might be a placeholder for cleanup tasks to be added later.
+    sc::iracing::shutdown();
+    // Additional GUI-specific shutdown tasks could go here
 }
 
 void sc::visor::gui::iracing::emit_content() {
