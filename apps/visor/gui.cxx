@@ -696,6 +696,8 @@ if (ImGui::BeginTabItem("Create Account")) { // Begin a tab item with the label 
             ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x); // Push the item width using the available content region width
             ImGui::InputTextWithHint("##AccountEnablementNameInput", "name", account_name_input_buffer.data(), account_name_input_buffer.size(), flags); // Display an input text box for name with a hint
             ImGui::InputTextWithHint("##AccountEnablementEmailInput", "e-mail", account_email_input_buffer.data(), account_email_input_buffer.size(), flags); // Display an input text box for email with a hint
+
+ImGui::InputTextWithHint("##AccountEnablementUsernameInput", "username", account_username_input_buffer.data(), account_username_input_buffer.size(), flags); // Add input text box for username
             ImGui::InputTextWithHint("##AccountEnablementPasswordInput", "password", account_password_input_buffer.data(), account_password_input_buffer.size(), flags | ImGuiInputTextFlags_Password); // Display an input text box for password with a hint and password mask
             ImGui::PopItemWidth(); // Pop the item width setting
             if (ImGui::Button("Create Account", { ImGui::GetContentRegionAvail().x, 0 })) { // Display a button with the label "Create Account"
@@ -704,6 +706,8 @@ if (ImGui::BeginTabItem("Create Account")) { // Begin a tab item with the label 
                     account_email_input_buffer.data(), // Pass the email input buffer as the email parameter
                     account_name_input_buffer.data(), // Pass the name input buffer as the name parameter
                     account_password_input_buffer.data() // Pass the password input buffer as the password parameter
+
+account_username_input_buffer.data() // Pass the username input buffer as the username parameter
                 );
                 animation_scan.frame_i = 0; // Reset the frame index of the scan animation
             }
