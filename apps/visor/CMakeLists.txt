@@ -3,6 +3,7 @@ add_executable(visor
     "main.cxx" # Source file for the main program
     "application.cxx" # Source file for the application logic
     "gui.cxx" # Source file for the GUI implementation
+    "gui-iRacing.cxx" # Source file for the iRacing GUI implementation
     "version.cxx" # Source file for handling version information
     "animation_instance.cxx" # Source file for handling animation instances
     "device_context.cxx" # Source file for managing device context
