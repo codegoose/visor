@@ -12,6 +12,15 @@ I create the user interface by leveraging an OpenGL 3.3 graphics context and [im
 
 The software also has the ability to read iRacing telemetry in real-time and display suspension and sway on the screen, among other things. I also did some tests related to automatically braking for the user if they were approaching a corner too fast. And it worked better than you'd think.
 
+Also, somebody came in after me and added some of the most useless comments I've ever seen:
+
+```c++
+// Create an ArgumentParser object named "program" with the application name and version
+static argparse::ArgumentParser program(VER_APP_NAME, VER_APP_VER);
+```
+
+That's why it's 70 commits behind.
+
 ### Objects of Interest
 
 * [OpenGL context, window initialization](https://github.com/codegoose/visor/blob/main/libs/boot/imgui_gl3_glfw3.hpp)
